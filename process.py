@@ -50,7 +50,7 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level):
         wav_dir (str): Directory containing the wave files.
         id_list (str): List of file basenames to process.
         out_dir (str): Directory to save the output to.
-        state_level (bool): Indicates that the label files are state level if True, otherwise they are frame level.
+        state_level (bool): Indicates that label files are state level if True, otherwise they are frame level.
         """
     file_ids = get_file_ids(lab_dir, id_list)
     _file_ids = get_file_ids(wav_dir, id_list)
