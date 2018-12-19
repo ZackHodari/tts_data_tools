@@ -1,0 +1,6 @@
+numpy
+matplotlib
+thensorflow
+protobuf
+pyworld
+pyreaper
