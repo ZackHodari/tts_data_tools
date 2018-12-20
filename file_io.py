@@ -8,6 +8,7 @@ Usage:
 import argparse
 from collections import Iterable
 import enum
+import re
 
 import numpy as np
 from tensorflow.train import Int64List, FloatList, Feature, FeatureList, FeatureLists, SequenceExample
@@ -108,15 +109,17 @@ def save_proto(data, file_path):
         writer.write(proto.SerializeToString())
 
 
-def load_bin(file_path, dtype=np.float32):
+def load_bin(file_path, feat_dim, dtype=np.float32):
     """Loads data from a binary file using numpy.
 
     Args:
         file_path (str): File to load the data from.
+        feat_dim (int): Dimensionality of the frame-level feature vectors.
 
     Returns:
         (np.ndarray) Sequence of frame-level vectors/floats/ints."""
-    return np.fromfile(file_path, dtype=dtype)
+    flat_data = np.fromfile(file_path, dtype=dtype)
+    return flat_data.reshape((-1, feat_dim))
 
 
 def save_bin(data, file_path):
@@ -164,19 +167,21 @@ def save_txt(data, file_path):
         file_path (str): File to save the data to."""
     array = np.array(data)
 
-    if isinstance(array.dtype, np.floating):
+    if np.issubdtype(array.dtype, np.floating):
         array = array.astype(np.float32)
         formatter = lambda x: '{:.12E}'.format(x)
-    elif isinstance(array.dtype, np.integer):
+    elif np.issubdtype(array.dtype, np.integer):
         array = array.astype(np.int32)
         formatter = lambda x: str(x)
+    else:
+        raise TypeError("Type of the data could not be serialised – {}".format(array.dtype))
 
     lines = [' '.join(formatter(val) for val in row) + '\n' for row in array]
     with open(file_path, 'w') as f:
         f.writelines(lines)
 
 
-def load(file_path, file_encoding=None):
+def load(file_path, file_encoding=None, feat_dim=None):
     if file_encoding is None:
         file_ext = file_path.split('.')[-1]
         file_encoding = infer_file_encoding(file_ext)
@@ -185,7 +190,7 @@ def load(file_path, file_encoding=None):
         return load_proto(file_path)
 
     elif file_encoding == FileEncodingEnum.BIN:
-        return load_bin(file_path)
+        return load_bin(file_path, feat_dim)
 
     elif file_encoding == FileEncodingEnum.TXT:
         return load_txt(file_path)
@@ -215,12 +220,14 @@ def save(data, file_path, file_encoding=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Script to load/save files in different encodings.")
     parser.add_argument(
-        "--in_file", action="store", dest="in_file", type=str, required=True, default=None, help="Input file.")
+        "--in_file", action="store", dest="in_file", type=str, required=True, help="Input file.")
     parser.add_argument(
-        "--out_file", action="store", dest="out_file", type=str, required=True, default=None, help="Output file.")
+        "--out_file", action="store", dest="out_file", type=str, required=True, help="Output file.")
+    parser.add_argument(
+        "--feat_dim", action="store", dest="feat_dim", type=int, default=None, help="Dimensionality of binary feature.")
     add_arguments(parser)
     args = parser.parse_args()
 
-    data = load(args.in_file, args.in_file_encoding)
+    data = load(args.in_file, args.in_file_encoding, args.feat_dim)
     save(data, args.out_file, args.out_file_encoding)
 
