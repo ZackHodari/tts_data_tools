@@ -87,10 +87,6 @@ class Wav(object):
         pad_start = np.tile(f0[0], 2)
         pad_end = np.tile(f0[-1], diff - 2)
 
-        print(f0.shape, diff, pad_start.shape, pad_end.shape)
-        print(f0.dtype, pad_start.dtype, pad_end.dtype)
-        print(f0[:10], pad_start, pad_end)
-
         f0 = np.concatenate((pad_start, f0, pad_end))
 
         num_frames = f0.shape[0]
