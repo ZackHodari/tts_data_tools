@@ -449,7 +449,7 @@ class Label(object):
         # Accumulator array used to add frame-level vectors to.
         frame_level_vectors = []
 
-        for label, phone_duration in zip(self.labels, self.state_level_durations):
+        for label, phone_duration in zip(self.labels, self.state_in_phone_durations):
             # Get the numerical label once for each phone using the question set.
             label_vector = question_set.query(label)
 
