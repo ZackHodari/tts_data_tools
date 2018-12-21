@@ -12,6 +12,8 @@ import pyworld
 import pyreaper
 import pysptk
 
+from file_io import save_bin
+
 
 def add_arguments(parser):
     pass
@@ -84,17 +86,37 @@ class Wav(object):
         diff = f0_world.shape[0] - f0.shape[0]
         pad_start = np.tile(f0[0], 2)
         pad_end = np.tile(f0[-1], diff - 2)
-        f0 = np.concatenate(pad_start, f0, pad_end)
 
+        print(f0.shape, diff, pad_start.shape, pad_end.shape)
+        print(f0.dtype, pad_start.dtype, pad_end.dtype)
+        print(f0[:10], pad_start, pad_end)
+
+        f0 = np.concatenate((pad_start, f0, pad_end))
+
+        num_frames = f0.shape[0]
+        f0_dim = 1
+        sp_dim = sp.shape[1]
+        ap_dim = ap.shape[1]
+        total_dim = f0_dim + sp_dim + ap_dim
+
+        print("Vocoder features created: {} frames; f0 dimensionality = {}; sp dimensionality = {}; "
+              "ap dimensionality = {}; and {} total features.".format(num_frames, f0_dim, sp_dim, ap_dim, total_dim))
         return f0, sp, ap
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Script to load wav files.")
-    parser.add_argument("--wav_file", action="store", dest="wav_file", type=str, help="Input wave file.")
+    parser.add_argument("--wav_file", action="store", dest="wav_file", type=str, required=True,
+                        help="File path of the wavfile to be vocoded.")
+    parser.add_argument("--out_file", action="store", dest="out_file", type=str, required=True,
+                        help="File path (without file extension) to save the vocoder features to.")
     add_arguments(parser)
     args = parser.parse_args()
 
     wav = Wav(args.wav_file)
-    print(wav)
+
+    f0, sp, ap = wav.extract_features()
+    save_bin(f0, '{}.f0'.format(args.out_file))
+    save_bin(sp, '{}.sp'.format(args.out_file))
+    save_bin(ap, '{}.ap'.format(args.out_file))
 
