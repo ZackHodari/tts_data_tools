@@ -9,7 +9,7 @@ setup(
     author_email='zack.hodari@ed.ac.uk',
     # license='MIT',
     packages=['tts_data_tools'],
-    data_files=[('tts_data_tools', ['tts_data_tools/question_sets/questions-unilex_dnn_600.hed',
-                                    'tts_data_tools/question_sets/questions-radio_dnn_416.hed',
-                                    'tts_data_tools/question_sets/questions-mandarin.hed',
-                                    'tts_data_tools/question_sets/questions-japanese.hed'])])
+    package_data={'tts_data_tools': ['question_sets/questions-unilex_dnn_600.hed',
+                                     'question_sets/questions-radio_dnn_416.hed',
+                                     'question_sets/questions-mandarin.hed',
+                                     'question_sets/questions-japanese.hed']})
