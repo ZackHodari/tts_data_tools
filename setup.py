@@ -9,5 +9,3 @@ setup(
     author_email='zack.hodari@ed.ac.uk',
     # license='MIT',
     packages=['tts_data_tools'])
-
-

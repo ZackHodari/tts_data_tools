@@ -12,6 +12,7 @@ import argparse
 from functools import wraps
 from multiprocessing.pool import ThreadPool
 import os
+from tqdm import tqdm
 
 from . import file_io
 from . import lab_features
@@ -43,7 +44,8 @@ def multithread(func):
     @wraps(func)
     def wrapper(args_list):
         pool = ThreadPool()
-        pool.map(func, args_list)
+        for _ in tqdm(pool.imap_unordered(func, args_list), total=len(args_list)):
+            pass
         pool.close()
         pool.join()
 
@@ -63,7 +65,7 @@ def singlethread(func):
     """
     @wraps(func)
     def wrapper(args_list):
-        for args in args_list:
+        for args in tqdm(args_list):
             func(args)
 
     return wrapper

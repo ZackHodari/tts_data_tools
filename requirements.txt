@@ -4,3 +4,4 @@ thensorflow
 protobuf
 pyworld
 pyreaper
+tqdm
