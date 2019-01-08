@@ -1,7 +1,8 @@
 """Handles loading and modifying label files.
 
 Usage:
-    python label_io.py --lab_file FILE"""
+    python label_io.py --lab_file FILE [--state_level] --question_file FILE [--subphone_feat_type STR] --out_file FILE
+"""
 
 import argparse
 import re

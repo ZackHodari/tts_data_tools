@@ -1,7 +1,7 @@
 """Handles loading and analysing wav files.
 
 Usage:
-    python feature_io.py --wav_file FILE"""
+    python feature_io.py --wav_file FILE --out_file FILE"""
 
 import argparse
 
