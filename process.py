@@ -110,7 +110,7 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, questions, su
     def save_lab_and_wav_to_proto(file_id):
         lab_path = os.path.join(lab_dir, '{}.lab'.format(file_id))
         label = lab_features.Label(lab_path, state_level)
-        numerical_labels = label.binarise(questions, suphone_features)
+        numerical_labels = label.normalise(questions, suphone_features)
 
         wav_path = os.path.join(wav_dir, '{}.wav'.format(file_id))
         wav = wav_features.Wav(wav_path)
@@ -154,7 +154,7 @@ def process_lab_files(lab_dir, id_list, out_dir, state_level, questions, suphone
         file_io.save_txt(duration, duration_path)
 
         numerical_label_path = os.path.join(out_dir, '{}.lab'.format(file_id))
-        numerical_labels = label.binarise(questions, suphone_features)
+        numerical_labels = label.normalise(questions, suphone_features)
         file_io.save_bin(numerical_labels, numerical_label_path)
 
     save_lab_and_dur_to_files(file_ids)
