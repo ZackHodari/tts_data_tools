@@ -119,7 +119,7 @@ def get_file_ids(file_dir, id_list=None):
         file_ids (list<str>): Basenames of files in dir or id_list"""
     if id_list is None:
         # Ignore hidden files starting with a period, and remove file extensions.
-        file_ids = filter(lambda f: not f.startsswith('.'), os.listdir(file_dir))
+        file_ids = filter(lambda f: not f.startswith('.'), os.listdir(file_dir))
         file_ids = list(map(lambda x: os.path.splitext(x)[0], file_ids))
     else:
         file_ids = lab_features.load_txt(id_list)
@@ -127,7 +127,7 @@ def get_file_ids(file_dir, id_list=None):
     return file_ids
 
 
-def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, questions, suphone_features):
+def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file, subphone_feat_type):
     """Processes label and wave files in id_list, saves the numerical labels and vocoder features to a protobuffer.
 
     Args:
@@ -136,9 +136,13 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, questions, su
         id_list (str): List of file basenames to process.
         out_dir (str): Directory to save the output to.
         state_level (bool): Indicates that label files are state level if True, otherwise they are frame level.
-        questions (label_io.QuestionSet instance): Question set used to query the labels.
-        suphone_features (label_io.SubphoneFeatureSet instance): Container that defines the subphone features to be
-            extracted from the durations. If None, then no additional frame-level features are added.
+        question_file (str): Question set to be loaded. Can be one of the four provided question sets;
+                questions-unilex_dnn_600.hed
+                questions-radio_dnn_416.hed
+                questions-mandarin.hed
+                questions-japanese.hed
+        subphone_feat_type (str): Subphone features to be extracted from the durations. If None, then no additional
+            frame-level features are added.
         """
     file_ids = get_file_ids(lab_dir, id_list)
     _file_ids = get_file_ids(wav_dir, id_list)
@@ -146,7 +150,10 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, questions, su
     if file_ids != _file_ids:
         raise ValueError("Please provide id_list, or ensure that wav_dir and lab_dir contain the same files.")
 
-    os.makedirs(out_dir)
+    os.makedirs(out_dir, exist_ok=True)
+
+    questions = lab_features.QuestionSet(question_file)
+    suphone_features = lab_features.SubphoneFeatureSet(subphone_feat_type)
 
     @multithread
     def save_lab_and_wav_to_proto(file_id):
@@ -172,7 +179,7 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, questions, su
     save_lab_and_wav_to_proto(file_ids)
 
 
-def process_lab_files(lab_dir, id_list, out_dir, state_level, questions, suphone_features):
+def process_lab_files(lab_dir, id_list, out_dir, state_level, question_file, subphone_feat_type):
     """Processes label files in id_list, saves the numerical labels and durations.
 
     Args:
@@ -180,14 +187,21 @@ def process_lab_files(lab_dir, id_list, out_dir, state_level, questions, suphone
         id_list (str): List of file basenames to process.
         out_dir (str): Directory to save the output to.
         state_level (bool): Indicates that the label files are state level if True, otherwise they are frame level.
-        questions (`label_io.QuestionSet` instance): Question set used to query the labels.
-        suphone_features (`label_io.SubphoneFeatureSet` instance): Container that defines the subphone features to be
-            extracted from the durations. If None, then no additional frame-level features are added.
+        question_file (str): Question set to be loaded. Can be one of the four provided question sets;
+                questions-unilex_dnn_600.hed
+                questions-radio_dnn_416.hed
+                questions-mandarin.hed
+                questions-japanese.hed
+        subphone_feat_type (str): Subphone features to be extracted from the durations. If None, then no additional
+            frame-level features are added.
         """
     file_ids = get_file_ids(lab_dir, id_list)
 
-    os.makedirs(os.path.join(out_dir, 'lab'))
-    os.makedirs(os.path.join(out_dir, 'dur'))
+    os.makedirs(os.path.join(out_dir, 'lab'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'dur'), exist_ok=True)
+
+    questions = lab_features.QuestionSet(question_file)
+    suphone_features = lab_features.SubphoneFeatureSet(subphone_feat_type)
 
     @multithread
     def save_lab_and_dur_to_files(file_id):
@@ -215,9 +229,9 @@ def process_wav_files(wav_dir, id_list, out_dir):
         """
     file_ids = get_file_ids(wav_dir, id_list)
 
-    os.makedirs(os.path.join(out_dir, 'f0'))
-    os.makedirs(os.path.join(out_dir, 'mgc'))
-    os.makedirs(os.path.join(out_dir, 'bap'))
+    os.makedirs(os.path.join(out_dir, 'f0'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'mgc'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'bap'), exist_ok=True)
 
     @multithread
     def save_wav_to_files(file_id):
@@ -239,22 +253,13 @@ if __name__ == "__main__":
     add_arguments(parser)
     args = parser.parse_args()
 
-    if args.question_file:
-        questions = lab_features.QuestionSet(args.question_file)
-    else:
-        questions = None
-
-    if args.subphone_feat_type:
-        suphone_features = lab_features.SubphoneFeatureSet(args.subphone_feat_type)
-    else:
-        suphone_features = None
-
     if args.lab_dir and args.wav_dir:
-        process_files(
-            args.lab_dir, args.wav_dir, args.id_list, args.out_dir, args.state_level, questions, suphone_features)
+        process_files(args.lab_dir, args.wav_dir, args.id_list, args.out_dir, args.state_level,
+                      args.question_file, args.subphone_feat_type)
 
     elif args.lab_dir:
-        process_lab_files(args.lab_dir, args.id_list, args.out_dir, args.state_level, questions, suphone_features)
+        process_lab_files(args.lab_dir, args.id_list, args.out_dir, args.state_level,
+                          args.question_file, args.subphone_feat_type)
 
     elif args.wav_dir:
         process_wav_files(args.wav_dir, args.id_list, args.out_dir)
