@@ -9,9 +9,11 @@ Usage:
 """
 
 import argparse
+from contextlib import contextmanager
 from functools import wraps
 from multiprocessing.pool import ThreadPool
 import os
+import sys
 from tqdm import tqdm
 
 from . import file_io
@@ -32,6 +34,38 @@ def add_arguments(parser):
     lab_features.add_arguments(parser)
 
 
+class DummyTqdmFile(object):
+    """Dummy file-like that will write to tqdm"""
+    file = None
+
+    def __init__(self, file):
+        self.file = file
+
+    def write(self, x):
+        # Avoid print() second call (useless \n)
+        if len(x.rstrip()) > 0:
+            tqdm.write(x, file=self.file)
+
+    def flush(self):
+        return getattr(self.file, "flush", lambda: None)()
+
+
+@contextmanager
+def tqdm_redirect_std():
+    orig_out_err = sys.stdout, sys.stderr
+    try:
+        sys.stdout, sys.stderr = map(DummyTqdmFile, orig_out_err)
+        yield orig_out_err[0]
+
+    # Relay exceptions
+    except Exception as exc:
+        raise exc
+
+    # Always restore sys.stdout/err if necessary
+    finally:
+        sys.stdout, sys.stderr = orig_out_err
+
+
 def multithread(func):
     """Uses Python multithreading to perform func over arg_list in parallel.
 
@@ -44,8 +78,10 @@ def multithread(func):
     @wraps(func)
     def wrapper(args_list):
         pool = ThreadPool()
-        for _ in tqdm(pool.imap_unordered(func, args_list), total=len(args_list)):
-            pass
+        with tqdm_redirect_std() as orig_stdout:
+            for _ in tqdm(pool.imap_unordered(func, args_list), total=len(args_list),
+                          file=orig_stdout, dynamic_ncols=True):
+                pass
         pool.close()
         pool.join()
 
@@ -65,24 +101,26 @@ def singlethread(func):
     """
     @wraps(func)
     def wrapper(args_list):
-        for args in tqdm(args_list):
-            func(args)
+        with tqdm_redirect_std() as orig_stdout:
+            for args in tqdm(args_list, file=orig_stdout, dynamic_ncols=True):
+                func(args)
 
     return wrapper
 
 
-def get_file_ids(dir, id_list=None):
+def get_file_ids(file_dir, id_list=None):
     """Determines the basenames of all files to be processed, using id_list of `os.listdir`.
 
     Args:
-        dir (str): Directory where the basenames would exist.
+        file_dir (str): Directory where the basenames would exist.
         id_list (str): File containing a list of basenames, if not given `os.listdir(dir)` is used instead.
 
     Returns:
         file_ids (list<str>): Basenames of files in dir or id_list"""
     if id_list is None:
-        file_ids = filter(lambda f: f.endswith('.lab'), os.listdir(dir))
-        file_ids = map(lambda x: x[:-len('.lab')], file_ids)
+        # Ignore hidden files starting with a period, and remove file extensions.
+        file_ids = filter(lambda f: not f.startsswith('.'), os.listdir(file_dir))
+        file_ids = list(map(lambda x: os.path.splitext(x)[0], file_ids))
     else:
         file_ids = lab_features.load_txt(id_list)
 
@@ -107,6 +145,8 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, questions, su
 
     if file_ids != _file_ids:
         raise ValueError("Please provide id_list, or ensure that wav_dir and lab_dir contain the same files.")
+
+    os.makedirs(out_dir)
 
     @multithread
     def save_lab_and_wav_to_proto(file_id):
@@ -146,16 +186,19 @@ def process_lab_files(lab_dir, id_list, out_dir, state_level, questions, suphone
         """
     file_ids = get_file_ids(lab_dir, id_list)
 
+    os.makedirs(os.path.join(out_dir, 'lab'))
+    os.makedirs(os.path.join(out_dir, 'dur'))
+
     @multithread
     def save_lab_and_dur_to_files(file_id):
         lab_path = os.path.join(lab_dir, '{}.lab'.format(file_id))
         label = lab_features.Label(lab_path, state_level)
 
-        duration_path = os.path.join(out_dir, '{}.dur'.format(file_id))
+        duration_path = os.path.join(out_dir, 'dur', '{}.dur'.format(file_id))
         duration = label.phone_durations
         file_io.save_txt(duration, duration_path)
 
-        numerical_label_path = os.path.join(out_dir, '{}.lab'.format(file_id))
+        numerical_label_path = os.path.join(out_dir, 'lab', '{}.lab'.format(file_id))
         numerical_labels = label.normalise(questions, suphone_features)
         file_io.save_bin(numerical_labels, numerical_label_path)
 
@@ -172,6 +215,10 @@ def process_wav_files(wav_dir, id_list, out_dir):
         """
     file_ids = get_file_ids(wav_dir, id_list)
 
+    os.makedirs(os.path.join(out_dir, 'f0'))
+    os.makedirs(os.path.join(out_dir, 'mgc'))
+    os.makedirs(os.path.join(out_dir, 'bap'))
+
     @multithread
     def save_wav_to_files(file_id):
         wav_path = os.path.join(wav_dir, '{}.wav'.format(file_id))
@@ -179,10 +226,9 @@ def process_wav_files(wav_dir, id_list, out_dir):
 
         f0, mgc, bap = wav.extract_features()
 
-        feature_path = os.path.join(out_dir, file_id)
-        file_io.save_bin(f0, '{}.f0'.format(feature_path))
-        file_io.save_bin(mgc, '{}.mgc'.format(feature_path))
-        file_io.save_bin(bap, '{}.bap'.format(feature_path))
+        file_io.save_bin(f0, os.path.join(out_dir, 'f0', '{}.f0'.format(file_id)))
+        file_io.save_bin(mgc, os.path.join(out_dir, 'mgc', '{}.mgc'.format(file_id)))
+        file_io.save_bin(bap, os.path.join(out_dir, 'bap', '{}.bap'.format(file_id)))
 
     save_wav_to_files(file_ids)
 
@@ -192,9 +238,6 @@ if __name__ == "__main__":
         description="Script to extract duration information from forced alignment label files.")
     add_arguments(parser)
     args = parser.parse_args()
-
-    if not os.path.isdir(args.out_dir):
-        os.makedirs(args.out_dir)
 
     if args.question_file:
         questions = lab_features.QuestionSet(args.question_file)
