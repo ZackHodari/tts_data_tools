@@ -18,7 +18,7 @@ FRAME_SHIFT_MS = 5
 def add_arguments(parser):
     parser.add_argument("--state_level", "-s", action="store_true", dest="state_level", default=True,
                         help="Is the label file state level (or frame level).")
-    parser.add_argument("--question_file", action="store", dest="question_file", type=str, default=None,
+    parser.add_argument("--question_file", action="store", dest="question_file", type=str, required=True,
                         help="File containing the '.hed' question set to query the labels with.")
     parser.add_argument("--subphone_feat_type", action="store", dest="subphone_feat_type", type=str, default=None,
                         help="The type of subphone counter features to add to the frame-level numerical vectors.")
@@ -449,7 +449,7 @@ class Label(object):
         # Accumulator array used to add frame-level vectors to.
         frame_level_vectors = []
 
-        for label, phone_duration in zip(self.labels, self.state_level_durations):
+        for label, phone_duration in zip(self.labels, self.state_in_phone_durations):
             # Get the numerical label once for each phone using the question set.
             label_vector = question_set.query(label)
 

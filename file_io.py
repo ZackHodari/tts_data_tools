@@ -19,8 +19,10 @@ FileEncodingEnum = enum.Enum("FileEncodingEnum", ("PROTO", "BIN", "TXT"))
 
 
 def infer_file_encoding(file_ext):
-    if file_ext in ['npy', 'f0', 'lf0', 'sp', 'mgc', 'mfb', 'ap', 'bap']:
+    if file_ext in ['npy', 'lab', 'f0', 'lf0', 'sp', 'mgc', 'mfb', 'ap', 'bap']:
         file_ext = 'bin'
+    if file_ext in ['dur']:
+        file_ext = 'txt'
     return FileEncodingEnum[file_ext.upper()]
 
 
@@ -174,7 +176,14 @@ def save_txt(data, file_path):
         array = array.astype(np.int32)
         formatter = lambda x: str(x)
     else:
-        raise TypeError("Type of the data could not be serialised – {}".format(array.dtype))
+        raise TypeError("Type of the data could not be serialised - {}".format(array.dtype))
+
+    if array.ndim == 0:
+        array = array[np.newaxis, np.newaxis]
+    elif array.ndim == 1:
+        array = array[:, np.newaxis]
+    elif array.ndim != 2:
+        raise ValueError("Only 1/2 dimensional data can be saved to text files, data.shape = {}".format(array.shape))
 
     lines = [' '.join(formatter(val) for val in row) + '\n' for row in array]
     with open(file_path, 'w') as f:
