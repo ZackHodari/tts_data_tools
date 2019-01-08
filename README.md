@@ -1,6 +1,8 @@
 # tts_data_tools
 Data processing tools for preparing speech and labels for training TTS voices
 
+## Installation
+`pip install git+https://github.com/zackhodari/tts_data_tools`
 
 ## Usage
 

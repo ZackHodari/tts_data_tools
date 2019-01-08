@@ -13,7 +13,7 @@ import pyworld
 import pyreaper
 import pysptk
 
-from file_io import save_bin
+from .file_io import save_bin
 
 
 def add_arguments(parser):

@@ -14,7 +14,7 @@ import re
 import numpy as np
 from scipy.stats import norm
 
-from file_io import save_bin
+from .file_io import save_bin
 
 STATES_PER_PHONE = 5
 FRAME_SHIFT_MS = 5

@@ -13,9 +13,9 @@ from functools import wraps
 from multiprocessing.pool import ThreadPool
 import os
 
-import file_io
-import lab_features
-import wav_features
+from . import file_io
+from . import lab_features
+from . import wav_features
 
 
 def add_arguments(parser):
