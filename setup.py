@@ -8,4 +8,5 @@ setup(
     author='Zack Hodari',
     author_email='zack.hodari@ed.ac.uk',
     # license='MIT',
-    packages=['tts_data_tools'])
+    packages=['tts_data_tools'],
+    data_files=[('tts_data_tools', ['tts_data_tools/question_sets/*'])])

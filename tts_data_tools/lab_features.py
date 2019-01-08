@@ -9,6 +9,8 @@ Usage:
 
 import argparse
 from enum import Enum
+import os
+import pkg_resources
 import re
 
 import numpy as np
@@ -90,8 +92,15 @@ class QuestionSet(object):
         """Loads question set and prepares regexes for querying.
 
         Attributes:
-            file_path (str): Question set to be loaded.
+            file_path (str): Question set to be loaded. Can be one of the four provided question sets;
+                questions-unilex_dnn_600.hed
+                questions-radio_dnn_416.hed
+                questions-mandarin.hed
+                questions-japanese.hed
         """
+        if file_path in pkg_resources.resource_listdir('tts_data_tools', 'question_sets'):
+            file_path = pkg_resources.resource_filename('tts_data_tools', os.path.join('question_sets', file_path))
+
         self.file_path = file_path
         self.lines = load_txt(self.file_path)
         # Ensure the only whitespaces are single space characters.
