@@ -1,7 +1,12 @@
 """Runs the feature extraction on the waveforms and binarises the label files.
 
 Usage:
-    python process.py [--lab_dir DIR] [--state_level] [--wav_dir DIR] [--id_list FILE] --out_dir DIR"""
+    python process.py \
+        [--lab_dir DIR] [--state_level] \
+        [--wav_dir DIR] \
+        [--id_list FILE] \
+        --out_dir DIR
+"""
 
 import argparse
 from functools import wraps
@@ -9,8 +14,8 @@ from multiprocessing.pool import ThreadPool
 import os
 
 import file_io
-import label_io
-import feature_io
+import lab_features
+import wav_features
 
 
 def add_arguments(parser):
@@ -23,7 +28,7 @@ def add_arguments(parser):
     parser.add_argument("--out_dir", action="store", dest="out_dir", type=str, required=True, default=None,
                         help="Directory to save the output to.")
     file_io.add_arguments(parser)
-    label_io.add_arguments(parser)
+    lab_features.add_arguments(parser)
 
 
 def multithread(func):
@@ -77,7 +82,7 @@ def get_file_ids(dir, id_list=None):
         file_ids = filter(lambda f: f.endswith('.lab'), os.listdir(dir))
         file_ids = map(lambda x: x[:-len('.lab')], file_ids)
     else:
-        file_ids = label_io.load_txt(id_list)
+        file_ids = lab_features.load_txt(id_list)
 
     return file_ids
 
@@ -104,11 +109,11 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, questions, su
     @multithread
     def save_lab_and_wav_to_proto(file_id):
         lab_path = os.path.join(lab_dir, '{}.lab'.format(file_id))
-        label = label_io.Label(lab_path, state_level)
+        label = lab_features.Label(lab_path, state_level)
         numerical_labels = label.binarise(questions, suphone_features)
 
         wav_path = os.path.join(wav_dir, '{}.wav'.format(file_id))
-        wav = feature_io.Wav(wav_path)
+        wav = wav_features.Wav(wav_path)
         f0, sp, ap = wav.extract_features()
 
         features = {
@@ -142,7 +147,7 @@ def process_lab_files(lab_dir, id_list, out_dir, state_level, questions, suphone
     @multithread
     def save_lab_and_dur_to_files(file_id):
         lab_path = os.path.join(lab_dir, '{}.lab'.format(file_id))
-        label = label_io.Label(lab_path, state_level)
+        label = lab_features.Label(lab_path, state_level)
 
         duration_path = os.path.join(out_dir, '{}.dur'.format(file_id))
         duration = label.phone_durations
@@ -168,7 +173,7 @@ def process_wav_files(wav_dir, id_list, out_dir):
     @multithread
     def save_wav_to_files(file_id):
         wav_path = os.path.join(wav_dir, '{}.wav'.format(file_id))
-        wav = feature_io.Wav(wav_path)
+        wav = wav_features.Wav(wav_path)
 
         f0, mgc, bap = wav.extract_features()
 
@@ -190,12 +195,12 @@ if __name__ == "__main__":
         os.makedirs(args.out_dir)
 
     if args.question_file:
-        questions = label_io.QuestionSet(args.question_file)
+        questions = lab_features.QuestionSet(args.question_file)
     else:
         questions = None
 
     if args.subphone_feat_type:
-        suphone_features = label_io.SubphoneFeatureSet(args.subphone_feat_type)
+        suphone_features = lab_features.SubphoneFeatureSet(args.subphone_feat_type)
     else:
         suphone_features = None
 

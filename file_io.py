@@ -1,24 +1,31 @@
 """Handles loading and saving to files, using protobuffers, binary files, or text files.
 
 Usage:
-    python file_io.py --in_file FILE --out_file FILE
-    python file_io.py --in_file FILE --out_file FILE --file_encoding ENUM
-    python file_io.py --in_file FILE --out_file FILE --in_file_encoding ENUM --out_file_encoding ENUM"""
+    python file_io.py \
+        --in_file FILE [--in_file_encoding ENUM] \
+        --out_file FILE [--out_file_encoding ENUM]
+
+    python file_io.py \
+        --in_file FILE \
+        --out_file FILE \
+        --file_encoding ENUM
+"""
 
 import argparse
 from collections import Iterable
-import enum
-import re
+from enum import Enum
+from pprint import pprint
 
 import numpy as np
-from tensorflow.train import Int64List, FloatList, Feature, FeatureList, FeatureLists, SequenceExample
 from tensorflow.python_io import TFRecordWriter
+from tensorflow.train import Int64List, FloatList, Feature, FeatureList, FeatureLists, SequenceExample
 
 
-FileEncodingEnum = enum.Enum("FileEncodingEnum", ("PROTO", "BIN", "TXT"))
+FileEncodingEnum = Enum("FileEncodingEnum", ("PROTO", "BIN", "TXT"))
 
 
 def infer_file_encoding(file_ext):
+    """Converts file_ext to a FileEncodingEnum."""
     if file_ext in ['npy', 'lab', 'f0', 'lf0', 'sp', 'mgc', 'mfb', 'ap', 'bap']:
         file_ext = 'bin'
     if file_ext in ['dur']:
@@ -36,10 +43,11 @@ def add_arguments(parser):
             raise argparse.ArgumentTypeError(msg)
 
     class OverrideAction(argparse.Action):
+        """Handles logic for allowing one argument to override two others."""
         def __call__(self, parser, namespace, values, option_string=None):
             namespace.__setattr__(self.dest, values)
 
-            # If file_encoding has already been written , then always use it to overwrite the other options.
+            # If file_encoding has already been written, then always use it to overwrite the other options.
             if namespace.file_encoding is not None:
                 namespace.__setattr__('in_file_encoding', namespace.file_encoding)
                 namespace.__setattr__('out_file_encoding', namespace.file_encoding)
@@ -61,12 +69,44 @@ def listify(values):
         return [values]
 
 
+def sanitise_array(data):
+    """Sanitises data to a numpy matrix of fixed shape, and ensures it has at most 2 axes.
+
+    Args:
+        data (list<_> or np.ndarray): Matrix/Vector/Scalar data in python lists (or as a numpy array).
+
+    Returns:
+        (np.ndarray): Sanitised numpy array with 2 axes."""
+    array = np.array(data)
+
+    if array.ndim == 0:
+        array = array[np.newaxis, np.newaxis]
+    elif array.ndim == 1:
+        array = array[:, np.newaxis]
+    elif array.ndim != 2:
+        raise ValueError("Only 1/2 dimensional data can be saved to text files, data.shape = {}".format(array.shape))
+
+    return array
+
+
 def load_proto(file_path):
-    pass
+    """Loads data from a `tf.train.SequenceExample` proto.
+
+    Args:
+        file_path (str): File to load the data from.
+
+    Returns:
+        (dict<str, np.ndarray>) Dictionary containing data for each feature."""
+    raise NotImplementedError("Loading from proto has not yet been implemented")
 
 
 def print_proto(file_path):
-    pass
+    """Prints the data from a `tf.train.SequenceExample` proto.
+
+    Args:
+        file_path (str): File to load the data from."""
+    proto = load_proto(file_path)
+    pprint(proto)
 
 
 def make_SequenceExample(data):
@@ -130,7 +170,7 @@ def save_bin(data, file_path):
     Args:
         data (np.ndarray): Sequence of frame-level vectors/floats/ints.
         file_path (str): File to save the data to."""
-    array = np.array(data)
+    array = sanitise_array(data)
 
     if isinstance(array.dtype, np.floating):
         array = array.astype(np.float32)
@@ -156,19 +196,22 @@ def load_txt(file_path):
     else:
         dtype = np.int32
 
-    return np.array(list(map(str.split, lines)), dtype=dtype)
+    data = list(map(str.split, lines))
+    array = np.array(data, dtype=dtype)
+    return array
 
 
 def save_txt(data, file_path):
     """Saves data as a text file.
 
-    If the data is floating point it is encoded into a string using scientific notation and 12 decimal places
+    If the data is floating point it is encoded into a string using scientific notation and 12 decimal places.
 
     Args:
         data (np.ndarray): Sequence of frame-level vectors/floats/ints.
         file_path (str): File to save the data to."""
-    array = np.array(data)
+    array = sanitise_array(data)
 
+    # If the data is floating then format the values in scientific notation.
     if np.issubdtype(array.dtype, np.floating):
         array = array.astype(np.float32)
         formatter = lambda x: '{:.12E}'.format(x)
@@ -177,13 +220,6 @@ def save_txt(data, file_path):
         formatter = lambda x: str(x)
     else:
         raise TypeError("Type of the data could not be serialised - {}".format(array.dtype))
-
-    if array.ndim == 0:
-        array = array[np.newaxis, np.newaxis]
-    elif array.ndim == 1:
-        array = array[:, np.newaxis]
-    elif array.ndim != 2:
-        raise ValueError("Only 1/2 dimensional data can be saved to text files, data.shape = {}".format(array.shape))
 
     lines = [' '.join(formatter(val) for val in row) + '\n' for row in array]
     with open(file_path, 'w') as f:

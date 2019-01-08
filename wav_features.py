@@ -1,7 +1,8 @@
 """Handles loading and analysing wav files.
 
 Usage:
-    python feature_io.py --wav_file FILE --out_file FILE"""
+    python wav_features.py --wav_file FILE --out_file FILE
+"""
 
 import argparse
 
@@ -44,16 +45,18 @@ def save_wav(file_path, data, sample_rate):
 class Wav(object):
     """Container for waveforms, allows for feature extraction."""
     def __init__(self, file_path):
-        """...
+        """Loads waveform.
 
-        :param file_path:
+        Args:
+            file_path (str): Wave file to be loaded.
         """
         self.data, self.sample_rate = load_wav(file_path)
 
     def reaper(self):
         """Extracts f0 using REAPER.
 
-        :return: fundamental frequency.
+        Returns:
+            (np.ndarray[n_frames]): fundamental frequency.
         """
         pm_times, pm, f0_times, f0, corr = pyreaper.reaper(self.data, self.sample_rate)
         return f0
@@ -61,7 +64,10 @@ class Wav(object):
     def world(self):
         """Extracts vocoder features using WORLD.
 
-        :return: fundamental frequency, smoothed spectrogram, aperiodicity.
+        Returns:
+            (np.ndarray[n_frames]): fundamental frequency,
+            (np.ndarray[n_frames, sp_dim]): smoothed spectrogram,
+            (np.ndarray[n_frames, ap_dim]): aperiodicity.
         """
         nbits = self.data.itemsize * 8
         int_ceiling = 2 ** (nbits - 1)
@@ -72,7 +78,10 @@ class Wav(object):
     def extract_features(self):
         """Extracts REAPER's f0 and WORLDS segmental features. Ensures they are the same number of frames.
 
-        :return: fundamental frequency, smoothed spectrogram, aperiodicity.
+        Returns:
+            (np.ndarray[n_frames]): fundamental frequency,
+            (np.ndarray[n_frames, sp_dim]): smoothed spectrogram,
+            (np.ndarray[n_frames, ap_dim]): aperiodicity.
         """
         f0 = self.reaper()
         f0_world, sp, ap = self.world()
