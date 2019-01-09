@@ -545,7 +545,7 @@ class Label(object):
         suphone_feature_dim = np.array(subphone_features).shape[0]
         total_dimensionality = np.array(frame_level_vectors[0]).shape[0]
         print("Numerical labels created: {} frames; {} question features; {} subphone counter features; and {} total "
-              "features.".format(number_of_frames, question_set_dim, suphone_feature_dim, total_dimensionality), end='\r')
+              "features.".format(number_of_frames, question_set_dim, suphone_feature_dim, total_dimensionality))
 
         return np.array(frame_level_vectors, dtype=np.float32)
 

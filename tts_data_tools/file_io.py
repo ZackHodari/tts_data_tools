@@ -117,7 +117,10 @@ def load_proto(file_path):
 
     Returns:
         (dict<str, np.ndarray>) Dictionary containing data for each feature."""
-    raise NotImplementedError("Loading from proto has not yet been implemented")
+    with open(file_path, 'rb') as f:
+        message = f.read()
+
+    return SequenceExample.FromString(message)
 
 
 def print_proto(file_path):
@@ -160,15 +163,16 @@ def make_SequenceExample(data):
 
 
 def save_proto(data, file_path):
-    """Converts data to a `tf.train.SequenceExample`, and saves it as a `TFRecord` file.
+    """Converts data to a `tf.train.SequenceExample` proto, and serialises to binary.
 
     Args:
         data (dict<str,list>): A map of feature names to a sequence of frame-level vectors/floats/ints.
         file_path (str): File to save the data to."""
     proto = make_SequenceExample(data)
-    with TFRecordWriter(file_path) as writer:
-        # write the example to a TFRecord file
-        writer.write(proto.SerializeToString())
+    message = proto.SerializeToString()
+
+    with open(file_path, 'wb') as f:
+        f.write(message)
 
 
 def load_bin(file_path, feat_dim, dtype=np.float32):
