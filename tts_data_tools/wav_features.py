@@ -85,7 +85,7 @@ class Wav(object):
         return f0, sp, ap
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Script to load wav files.")
     parser.add_argument("--wav_file", action="store", dest="wav_file", type=str, required=True,
                         help="File path of the wavfile to be vocoded.")
@@ -100,4 +100,8 @@ if __name__ == "__main__":
     save_bin(f0, '{}.f0'.format(args.out_file))
     save_bin(sp, '{}.sp'.format(args.out_file))
     save_bin(ap, '{}.ap'.format(args.out_file))
+
+
+if __name__ == "__main__":
+    main()
 

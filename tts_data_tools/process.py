@@ -69,8 +69,9 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
         f0, sp, ap = wav.extract_features()
 
         features = {
+            'name': file_id,
             'lab': numerical_labels,
-            'duration': label.phone_durations,
+            'dur': label.phone_durations,
             'f0': f0,
             'sp': sp,
             'ap': ap
@@ -150,7 +151,7 @@ def process_wav_files(wav_dir, id_list, out_dir):
     save_wav_to_files(file_ids)
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(
         description="Script to extract duration information from forced alignment label files.")
     add_arguments(parser)
@@ -167,3 +168,6 @@ if __name__ == "__main__":
     elif args.wav_dir:
         process_wav_files(args.wav_dir, args.id_list, args.out_dir)
 
+
+if __name__ == "__main__":
+    main()

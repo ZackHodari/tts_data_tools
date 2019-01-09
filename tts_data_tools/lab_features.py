@@ -23,7 +23,7 @@ FRAME_SHIFT_MS = 5
 
 SubphoneFeatureTypeEnum = Enum(
     "SubphoneFeatureTypeEnum",
-    ('FULL', 'MINIMAL_PHONEME', 'MINIMAL_FRAME', 'FRAME_ONLY', 'STATE_ONLY', 'UNIFORM_STATE', 'COARSE_CODING'))
+    ('FULL', 'MINIMAL_PHONEME', 'MINIMAL_FRAME', 'FRAME_ONLY', 'STATE_ONLY', 'UNIFORM_STATE', 'COARSE_CODING', 'NONE'))
 
 
 def add_arguments(parser):
@@ -244,7 +244,10 @@ class SubphoneFeatureSet(object):
     Attributes:
         subphone_feature_type (SubphoneFeatureTypeEnum): The type of counter feature set to extract.
     """
-    def __init__(self, subphone_feature_type):
+    def __init__(self, subphone_feature_type='none'):
+        if subphone_feature_type is None:
+            subphone_feature_type = 'none'
+
         self.subphone_feature_type = SubphoneFeatureTypeEnum[subphone_feature_type.upper()]
 
     @staticmethod
@@ -383,6 +386,9 @@ class SubphoneFeatureSet(object):
             # Equivalent to a frame-based positioning system reported in Heiga Zen's work.
             return self.coarse_coding(frame_index_in_phone, frames_in_phone)
 
+        else:
+            return []
+
 
 class Label(object):
     """Container for full-context labels, allows for binarising of labels.
@@ -496,7 +502,7 @@ class Label(object):
 
         return state_level_durations, phone_level_durations
 
-    def normalise(self, question_set, subphone_feature_set=None, upsample_to_frame_level=True):
+    def normalise(self, question_set, subphone_feature_set, upsample_to_frame_level=True):
         """Queries the labels using the question set, calculates any additional features, and returns vectorised labels.
 
         Args:
@@ -524,12 +530,9 @@ class Label(object):
                     # We can't track `frame_index` here as it would reset for each state.
                     for frame_index in range(frames_in_state):
                         # Get the subphone counter features for this frame.
-                        if subphone_feature_set:
-                            subphone_features = subphone_feature_set.query(
-                                frame_index, frame_index_in_phone, state_index, frames_in_state, frames_in_phone,
-                                self.states_per_phone)
-                        else:
-                            subphone_features = []
+                        subphone_features = subphone_feature_set.query(
+                            frame_index, frame_index_in_phone, state_index, frames_in_state, frames_in_phone,
+                            self.states_per_phone)
 
                         # Add the phone-level label and the frame-level counters to our accumulator array.
                         frame_level_vectors.append(np.concatenate((label_vector, subphone_features)))
@@ -547,7 +550,7 @@ class Label(object):
         return np.array(frame_level_vectors, dtype=np.float32)
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Script to load label files.")
     parser.add_argument("--lab_file", action="store", dest="lab_file", type=str, required=True,
                         help="File path of the label to be converted.")
@@ -558,11 +561,12 @@ if __name__ == "__main__":
 
     label = Label(args.lab_file, args.state_level)
     questions = QuestionSet(args.question_file)
-    if args.subphone_feat_type:
-        suphone_features = SubphoneFeatureSet(args.subphone_feat_type)
-    else:
-        suphone_features = None
+    suphone_features = SubphoneFeatureSet(args.subphone_feat_type)
 
     numerical_labels = label.normalise(questions, suphone_features)
     save_bin(numerical_labels, args.out_file)
+
+
+if __name__ == "__main__":
+    main()
 

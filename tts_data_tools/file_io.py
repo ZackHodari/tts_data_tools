@@ -36,32 +36,7 @@ def infer_file_encoding(file_ext):
 
 
 def add_arguments(parser):
-    def enumtype(astring):
-        try:
-            return infer_file_encoding(astring)
-        except KeyError:
-            msg = ', '.join([t.name.lower() for t in FileEncodingEnum])
-            msg = 'CustomEnumType: use one of {%s}'%msg
-            raise argparse.ArgumentTypeError(msg)
-
-    class OverrideAction(argparse.Action):
-        """Handles logic for allowing one argument to override two others."""
-        def __call__(self, parser, namespace, values, option_string=None):
-            namespace.__setattr__(self.dest, values)
-
-            # If file_encoding has already been written, then always use it to overwrite the other options.
-            if namespace.file_encoding is not None:
-                namespace.__setattr__('in_file_encoding', namespace.file_encoding)
-                namespace.__setattr__('out_file_encoding', namespace.file_encoding)
-
-    parser.register('action', 'override', OverrideAction)
-
-    parser.add_argument("--in_file_encoding", action="override", dest="in_file_encoding", type=enumtype,
-                        help="The encoding to load the file with.")
-    parser.add_argument("--out_file_encoding", action="override", dest="out_file_encoding", type=enumtype,
-                        help="The encoding to save the file with.")
-    parser.add_argument("--file_encoding", action="override", dest="file_encoding", type=enumtype,
-                        help="The encoding to load/save the file with. Overrides {in|out}_file_encoding arguments.")
+    pass
 
 
 def listify(values):
@@ -312,8 +287,22 @@ def save(data, file_path, file_encoding=None):
         raise NotImplementedError("Saving for file encoding '{}' not implemented".format(file_encoding))
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Script to load/save files in different encodings.")
+
+    def enumtype(astring):
+        try:
+            return infer_file_encoding(astring)
+        except KeyError:
+            msg = ', '.join([t.name.lower() for t in FileEncodingEnum])
+            msg = 'CustomEnumType: use one of {%s}'%msg
+            raise argparse.ArgumentTypeError(msg)
+
+    parser.add_argument("--in_file_encoding", action="store", dest="in_file_encoding", type=enumtype,
+                        help="The encoding to load the file with.")
+    parser.add_argument("--out_file_encoding", action="store", dest="out_file_encoding", type=enumtype,
+                        help="The encoding to save the file with.")
+
     parser.add_argument(
         "--in_file", action="store", dest="in_file", type=str, required=True, help="Input file.")
     parser.add_argument(
@@ -325,4 +314,8 @@ if __name__ == "__main__":
 
     data = load(args.in_file, args.in_file_encoding, args.feat_dim)
     save(data, args.out_file, args.out_file_encoding)
+
+
+if __name__ == "__main__":
+    main()
 
