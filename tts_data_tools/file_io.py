@@ -15,8 +15,10 @@ import argparse
 from collections import Iterable
 from enum import Enum
 from pprint import pprint
+from scipy.io import wavfile
 
 import numpy as np
+import pysptk
 from tensorflow.python_io import TFRecordWriter
 from tensorflow.train import Int64List, FloatList, Feature, FeatureList, FeatureLists, SequenceExample
 
@@ -87,6 +89,54 @@ def sanitise_array(data):
         raise ValueError("Only 1/2 dimensional data can be saved to text files, data.shape = {}".format(array.shape))
 
     return array
+
+
+def load_lines(file_path):
+    """Loads text data from a text file.
+
+    Args:
+        file_path (str): File to load the text from.
+
+    Returns:
+        (list<str>) Sequence of strings."""
+    with open(file_path, 'r') as f:
+        lines = list(map(str.strip, f.readlines()))
+
+    return lines
+
+
+def save_lines(lines, file_path):
+    """Saves text in a text file.
+
+    Args:
+        lines (list<str>): Sequence of strings.
+        file_path (str): File to save the text to."""
+    lines = list(map(lambda x: '{}\n'.format(line) for line in lines))
+
+    with open(file_path, 'w') as f:
+        f.writelines(lines)
+
+
+def load_wav(file_path):
+    """Loads wave data from wavfile.
+
+    Args:
+        file_path (str): File to load from.
+
+    Returns:
+        (np.ndarray) Waveform samples,
+        (int) Sample rate of waveform."""
+    sample_rate, data = wavfile.read(pysptk.util.example_audio_file())
+    return data, sample_rate
+
+
+def save_wav(file_path, data, sample_rate):
+    """Saves wave data to wavfile.
+
+    Args:
+        data (np.ndarray): Waveform samples.
+        file_path (str): File to save to."""
+    wavfile.write(file_path, sample_rate, data)
 
 
 def load_proto(file_path):

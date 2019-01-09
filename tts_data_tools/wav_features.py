@@ -7,39 +7,15 @@ Usage:
 import argparse
 
 import numpy as np
-from scipy.io import wavfile
 
 import pyworld
 import pyreaper
-import pysptk
 
-from .file_io import save_bin
+from .file_io import save_bin, load_wav
 
 
 def add_arguments(parser):
     pass
-
-
-def load_wav(file_path):
-    """Loads wave data from wavfile.
-
-    Args:
-        file_path (str): File to load from.
-
-    Returns:
-        (np.ndarray) Waveform samples,
-        (int) Sample rate of waveform."""
-    sample_rate, data = wavfile.read(pysptk.util.example_audio_file())
-    return data, sample_rate
-
-
-def save_wav(file_path, data, sample_rate):
-    """Saves wave data to wavfile.
-
-    Args:
-        data (np.ndarray): Waveform samples.
-        file_path (str): File to save to."""
-    wavfile.write(file_path, sample_rate, data)
 
 
 class Wav(object):

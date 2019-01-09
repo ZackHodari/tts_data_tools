@@ -16,7 +16,7 @@ import re
 import numpy as np
 from scipy.stats import norm
 
-from .file_io import save_bin
+from .file_io import save_bin, load_lines
 
 STATES_PER_PHONE = 5
 FRAME_SHIFT_MS = 5
@@ -33,32 +33,6 @@ def add_arguments(parser):
                         help="File containing the '.hed' question set to query the labels with.")
     parser.add_argument("--subphone_feat_type", action="store", dest="subphone_feat_type", type=str, default=None,
                         help="The type of subphone counter features to add to the frame-level numerical vectors.")
-
-
-def load_txt(file_path):
-    """Loads text data from a text file.
-
-    Args:
-        file_path (str): File to load the text from.
-
-    Returns:
-        (list<str>) Sequence of strings."""
-    with open(file_path, 'r') as f:
-        lines = list(map(str.strip, f.readlines()))
-
-    return lines
-
-
-def save_txt(lines, file_path):
-    """Saves text in a text file.
-
-    Args:
-        lines (list<str>): Sequence of strings.
-        file_path (str): File to save the text to."""
-    lines = list(map(lambda x: '{}\n'.format(line) for line in lines))
-
-    with open(file_path, 'w') as f:
-        f.writelines(lines)
 
 
 def hed_to_new_format(hed_file_name):
@@ -102,7 +76,7 @@ class QuestionSet(object):
             file_path = pkg_resources.resource_filename('tts_data_tools', os.path.join('question_sets', file_path))
 
         self.file_path = file_path
-        self.lines = load_txt(self.file_path)
+        self.lines = load_lines(self.file_path)
         # Ensure the only whitespaces are single space characters.
         self.lines = list(map(lambda l: re.sub('\s+', ' ', l), self.lines))
 
@@ -436,7 +410,7 @@ class Label(object):
         self.state_level = state_level
         self.states_per_phone = states_per_phone if state_level else 1
 
-        self.lines = load_txt(self.file_path)
+        self.lines = load_lines(self.file_path)
         # Ensure the all whitespaces are single space characters.
         self.lines = list(map(lambda l: re.sub('\s+', ' ', l), self.lines))
 

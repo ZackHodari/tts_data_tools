@@ -9,16 +9,12 @@ Usage:
 """
 
 import argparse
-from contextlib import contextmanager
-from functools import wraps
-from multiprocessing.pool import ThreadPool
 import os
-import sys
-from tqdm import tqdm
 
 from . import file_io
 from . import lab_features
 from . import wav_features
+from . import utils
 
 
 def add_arguments(parser):
@@ -32,99 +28,6 @@ def add_arguments(parser):
                         help="Directory to save the output to.")
     file_io.add_arguments(parser)
     lab_features.add_arguments(parser)
-
-
-class DummyTqdmFile(object):
-    """Dummy file-like that will write to tqdm"""
-    file = None
-
-    def __init__(self, file):
-        self.file = file
-
-    def write(self, x):
-        # Avoid print() second call (useless \n)
-        if len(x.rstrip()) > 0:
-            tqdm.write(x, file=self.file)
-
-    def flush(self):
-        return getattr(self.file, "flush", lambda: None)()
-
-
-@contextmanager
-def tqdm_redirect_std():
-    orig_out_err = sys.stdout, sys.stderr
-    try:
-        sys.stdout, sys.stderr = map(DummyTqdmFile, orig_out_err)
-        yield orig_out_err[0]
-
-    # Relay exceptions
-    except Exception as exc:
-        raise exc
-
-    # Always restore sys.stdout/err if necessary
-    finally:
-        sys.stdout, sys.stderr = orig_out_err
-
-
-def multithread(func):
-    """Uses Python multithreading to perform func over arg_list in parallel.
-
-    Args:
-        func (callable): Python function that will be parallelised.
-
-    Callable Args:
-        args_list (list<args>): A list where each item are valid argument(s) for func, e.g. args_list can be file_ids.
-    """
-    @wraps(func)
-    def wrapper(args_list):
-        pool = ThreadPool()
-        with tqdm_redirect_std() as orig_stdout:
-            for _ in tqdm(pool.imap_unordered(func, args_list), total=len(args_list),
-                          file=orig_stdout, dynamic_ncols=True):
-                pass
-        pool.close()
-        pool.join()
-
-    return wrapper
-
-
-def singlethread(func):
-    """Calls func for all items in args_list, but not in parallel.
-
-    This function exists multithread decorator can be replaced without changing any other code.
-
-    Args:
-        func (callable): Python function that will be parallelised.
-
-    Callable Args:
-        args_list (list<args>): A list where each item are valid argument(s) for func, e.g. args_list can be file_ids.
-    """
-    @wraps(func)
-    def wrapper(args_list):
-        with tqdm_redirect_std() as orig_stdout:
-            for args in tqdm(args_list, file=orig_stdout, dynamic_ncols=True):
-                func(args)
-
-    return wrapper
-
-
-def get_file_ids(file_dir, id_list=None):
-    """Determines the basenames of all files to be processed, using id_list of `os.listdir`.
-
-    Args:
-        file_dir (str): Directory where the basenames would exist.
-        id_list (str): File containing a list of basenames, if not given `os.listdir(dir)` is used instead.
-
-    Returns:
-        file_ids (list<str>): Basenames of files in dir or id_list"""
-    if id_list is None:
-        # Ignore hidden files starting with a period, and remove file extensions.
-        file_ids = filter(lambda f: not f.startswith('.'), os.listdir(file_dir))
-        file_ids = list(map(lambda x: os.path.splitext(x)[0], file_ids))
-    else:
-        file_ids = lab_features.load_txt(id_list)
-
-    return file_ids
 
 
 def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file, subphone_feat_type):
@@ -144,8 +47,8 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
         subphone_feat_type (str): Subphone features to be extracted from the durations. If None, then no additional
             frame-level features are added.
         """
-    file_ids = get_file_ids(lab_dir, id_list)
-    _file_ids = get_file_ids(wav_dir, id_list)
+    file_ids = utils.get_file_ids(lab_dir, id_list)
+    _file_ids = utils.get_file_ids(wav_dir, id_list)
 
     if file_ids != _file_ids:
         raise ValueError("Please provide id_list, or ensure that wav_dir and lab_dir contain the same files.")
@@ -155,7 +58,7 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
     questions = lab_features.QuestionSet(question_file)
     suphone_features = lab_features.SubphoneFeatureSet(subphone_feat_type)
 
-    @multithread
+    @utils.multithread
     def save_lab_and_wav_to_proto(file_id):
         lab_path = os.path.join(lab_dir, '{}.lab'.format(file_id))
         label = lab_features.Label(lab_path, state_level)
@@ -195,7 +98,7 @@ def process_lab_files(lab_dir, id_list, out_dir, state_level, question_file, sub
         subphone_feat_type (str): Subphone features to be extracted from the durations. If None, then no additional
             frame-level features are added.
         """
-    file_ids = get_file_ids(lab_dir, id_list)
+    file_ids = utils.get_file_ids(lab_dir, id_list)
 
     os.makedirs(os.path.join(out_dir, 'lab'), exist_ok=True)
     os.makedirs(os.path.join(out_dir, 'dur'), exist_ok=True)
@@ -203,7 +106,7 @@ def process_lab_files(lab_dir, id_list, out_dir, state_level, question_file, sub
     questions = lab_features.QuestionSet(question_file)
     suphone_features = lab_features.SubphoneFeatureSet(subphone_feat_type)
 
-    @multithread
+    @utils.multithread
     def save_lab_and_dur_to_files(file_id):
         lab_path = os.path.join(lab_dir, '{}.lab'.format(file_id))
         label = lab_features.Label(lab_path, state_level)
@@ -227,13 +130,13 @@ def process_wav_files(wav_dir, id_list, out_dir):
         id_list (str): List of file basenames to process.
         out_dir (str): Directory to save the output to.
         """
-    file_ids = get_file_ids(wav_dir, id_list)
+    file_ids = utils.get_file_ids(wav_dir, id_list)
 
     os.makedirs(os.path.join(out_dir, 'f0'), exist_ok=True)
     os.makedirs(os.path.join(out_dir, 'mgc'), exist_ok=True)
     os.makedirs(os.path.join(out_dir, 'bap'), exist_ok=True)
 
-    @multithread
+    @utils.multithread
     def save_wav_to_files(file_id):
         wav_path = os.path.join(wav_dir, '{}.wav'.format(file_id))
         wav = wav_features.Wav(wav_path)
