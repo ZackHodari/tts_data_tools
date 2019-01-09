@@ -36,15 +36,6 @@ def add_arguments(parser):
     pass
 
 
-def listify(values):
-    if isinstance(values, str):
-        return bytes(values, 'utf8')
-    elif isinstance(values, Iterable):
-        return list(values)
-    else:
-        return [values]
-
-
 def sanitise_array(data):
     """Sanitises data to a numpy matrix of fixed shape, and ensures it has at most 2 axes.
 
@@ -73,13 +64,12 @@ def make_SequenceExample(data, context=None):
         context (dict<str,vector>): A map of feature names to a vector/float/int/string."""
     def vector_to_Feature(vector):
         """Creates a `tf.train.Feature` proto."""
-        vector = listify(vector)
-        if isinstance(vector[0], int):
+        if isinstance(vector, np.ndarray) and np.issubdtype(vector.dtype, np.integer):
             return Feature(int64_list=Int64List(value=vector))
-        elif isinstance(vector[0], float):
+        elif isinstance(vector, np.ndarray) and np.issubdtype(vector.dtype, np.floating):
             return Feature(float_list=FloatList(value=vector))
         else:
-            return Feature(bytes_list=BytesList(value=vector))
+            return Feature(bytes_list=BytesList(value=[bytes(vector, 'utf8')]))
 
     def vectors_to_FeatureList(vectors):
         """Creates a `tf.train.FeatureList` proto."""

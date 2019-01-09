@@ -69,16 +69,16 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
         f0, sp, ap = wav.extract_features()
 
         features = {
-            'name': file_id,
             'lab': numerical_labels,
-            'dur': label.phone_durations,
-            'f0': f0,
+            'dur': label.phone_durations.reshape((-1, 1)),
+            'f0': f0.reshape((-1, 1)),
             'sp': sp,
             'ap': ap
         }
+        proto = file_io.make_SequenceExample(features, {'name': file_id})
 
         feature_path = os.path.join(out_dir, '{}.proto'.format(file_id))
-        file_io.save_proto(features, feature_path)
+        file_io.save_proto(proto, feature_path)
 
     save_lab_and_wav_to_proto(file_ids)
 
