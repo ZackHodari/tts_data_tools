@@ -13,9 +13,11 @@ from pprint import pprint
 from scipy.io import wavfile
 
 import numpy as np
-import pysptk
-from tensorflow.python_io import TFRecordWriter
-from tensorflow.train import Int64List, FloatList, Feature, FeatureList, FeatureLists, SequenceExample
+from tensorflow import parse_single_sequence_example
+from tensorflow.data import TFRecordDataset
+from tensorflow.python_io import tf_record_iterator, TFRecordWriter
+from tensorflow.train import Int64List, FloatList, BytesList, \
+    Feature, Features, FeatureList, FeatureLists, SequenceExample
 
 
 FileEncodingEnum = Enum("FileEncodingEnum", ("PROTO", "BIN", "TXT"))
@@ -35,7 +37,9 @@ def add_arguments(parser):
 
 
 def listify(values):
-    if isinstance(values, Iterable):
+    if isinstance(values, str):
+        return bytes(values, 'utf8')
+    elif isinstance(values, Iterable):
         return list(values)
     else:
         return [values]
@@ -59,6 +63,50 @@ def sanitise_array(data):
         raise ValueError("Only 1/2 dimensional data can be saved to text files, data.shape = {}".format(array.shape))
 
     return array
+
+
+def make_SequenceExample(data, context=None):
+    """Creates a `tf.train.SequenceExample` proto popoulated with the information in data.
+
+    Args:
+        data (dict<str,list<vector>>): A map of feature names to a sequence of frame-level vectors/floats/ints/strings.
+        context (dict<str,vector>): A map of feature names to a vector/float/int/string."""
+    def vector_to_Feature(vector):
+        """Creates a `tf.train.Feature` proto."""
+        vector = listify(vector)
+        if isinstance(vector[0], int):
+            return Feature(int64_list=Int64List(value=vector))
+        elif isinstance(vector[0], float):
+            return Feature(float_list=FloatList(value=vector))
+        else:
+            return Feature(bytes_list=BytesList(value=vector))
+
+    def vectors_to_FeatureList(vectors):
+        """Creates a `tf.train.FeatureList` proto."""
+        return FeatureList(feature=[
+            vector_to_Feature(vector) for vector in vectors
+        ])
+
+    def data_to_FeatureLists(dictionary):
+        """Creates a `tf.train.FeatureLists` proto."""
+        return FeatureLists(
+            feature_list={
+                key: vectors_to_FeatureList(vectors) for key, vectors in dictionary.items()
+            }
+        )
+
+    def context_to_Features(dictionary):
+        """Creates a `tf.train.Features` proto."""
+        return Features(
+            feature={
+                key: vector_to_Feature(vector) for key, vector in dictionary.items()
+            }
+        )
+
+    if context is None:
+        context = {}
+    return SequenceExample(feature_lists=data_to_FeatureLists(data),
+                           context=context_to_Features(context))
 
 
 def load_lines(file_path):
@@ -96,7 +144,7 @@ def load_wav(file_path):
     Returns:
         (np.ndarray) Waveform samples,
         (int) Sample rate of waveform."""
-    sample_rate, data = wavfile.read(pysptk.util.example_audio_file())
+    sample_rate, data = wavfile.read(file_path)
     return data, sample_rate
 
 
@@ -116,63 +164,68 @@ def load_proto(file_path):
         file_path (str): File to load the data from.
 
     Returns:
-        (dict<str, np.ndarray>) Dictionary containing data for each feature."""
+        (`tf.train.SequenceExample`) Proto containing data for each feature."""
     with open(file_path, 'rb') as f:
         message = f.read()
 
     return SequenceExample.FromString(message)
 
 
-def print_proto(file_path):
-    """Prints the data from a `tf.train.SequenceExample` proto.
-
-    Args:
-        file_path (str): File to load the data from."""
-    proto = load_proto(file_path)
-    pprint(proto)
-
-
-def make_SequenceExample(data):
-    """Creates a `tf.train.SequenceExample` proto popoulated with the information in data.
-
-    Args:
-        data (dict<str,list>): A map of feature names to a sequence of frame-level vectors/floats/ints."""
-    def vector_to_Feature(vector):
-        """Creates a `tf.train.Feature` proto."""
-        vector = listify(vector)
-        if isinstance(vector[0], int):
-            return Feature(int64_list=Int64List(value=vector))
-        else:
-            return Feature(float_list=FloatList(value=vector))
-
-    def vectors_to_FeatureList(vectors):
-        """Creates a `tf.train.FeatureList` proto."""
-        return FeatureList(feature=[
-            vector_to_Feature(vector) for vector in vectors
-        ])
-
-    def dictionary_to_FeatureLists(dictionary):
-        """Creates a `tf.train.FeatureLists` proto."""
-        return FeatureLists(
-            feature_list={
-                key: vectors_to_FeatureList(vectors) for key, vectors in dictionary.items()
-            }
-        )
-
-    return SequenceExample(feature_lists=dictionary_to_FeatureLists(data))
-
-
-def save_proto(data, file_path):
+def save_proto(proto, file_path):
     """Converts data to a `tf.train.SequenceExample` proto, and serialises to binary.
 
     Args:
-        data (dict<str,list>): A map of feature names to a sequence of frame-level vectors/floats/ints.
-        file_path (str): File to save the data to."""
-    proto = make_SequenceExample(data)
+        data (dict<str,list<vector>>): A map of feature names to a sequence of frame-level vectors/floats/ints/string.
+        file_path (str): File to save the data to.
+        context (dict<str,vector>): A map of feature names to a vector/float/int/string."""
     message = proto.SerializeToString()
 
     with open(file_path, 'wb') as f:
         f.write(message)
+
+
+def load_TFRecord(file_path):
+    """Loads a list of `tf.train.SequenceExample` protos, saved in a `TFRecord`
+
+    Args:
+        file_path (str): File to load the data from.
+
+    Returns:
+        (list<tf.train.SequenceExample>) List of protos containing data for each feature."""
+    record_iterator = tf_record_iterator(path=file_path)
+
+    protos = []
+    for message in record_iterator:
+        proto = SequenceExample.FromString(message)
+        protos.append(proto)
+
+    return protos
+
+
+def save_TFRecord(protos, file_path):
+    """Saves a list of protos to a TFRecord, which can be used with `tf.data.TFRecordDataset`.
+
+    Args:
+        protos (list<tf.train.SequenceExample>) List of SequenceExample protos.
+        file_path (str): File to load the data from."""
+    with TFRecordWriter(file_path) as writer:
+        for proto in protos:
+            message = proto.SerializeToString()
+            writer.write(message)
+
+
+def load_dataset(file_path, context_features, sequence_features, shapes, max_examples=4096, batch_size=32):
+    raw_dataset = TFRecordDataset(file_path)
+
+    def _parse_proto(proto):
+        context_dict, features_dict = parse_single_sequence_example(proto, context_features, sequence_features)
+        return context_dict, features_dict
+
+    dataset = raw_dataset.map(_parse_proto)
+    dataset.shuffle(max_examples)
+    dataset.padded_batch(batch_size, padded_shapes=shapes)
+    dataset.repeat()
+    return dataset
 
 
 def load_bin(file_path, feat_dim, dtype=np.float32):
