@@ -4,11 +4,6 @@ Usage:
     python file_io.py \
         --in_file FILE [--in_file_encoding ENUM] \
         --out_file FILE [--out_file_encoding ENUM]
-
-    python file_io.py \
-        --in_file FILE \
-        --out_file FILE \
-        --file_encoding ENUM
 """
 
 import argparse
