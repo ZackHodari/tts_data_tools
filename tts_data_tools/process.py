@@ -68,12 +68,15 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
         wav = wav_features.Wav(wav_path)
         f0, sp, ap = wav.extract_features()
 
+        # Often there is a small difference in number of frames between labels and vocoder features
+        n_frames = min(numerical_labels.shape[0], f0.shape[0])
+
         features = {
-            'lab': numerical_labels,
+            'lab': numerical_labels[:n_frames],
             'dur': label.phone_durations.reshape((-1, 1)),
-            'f0': f0.reshape((-1, 1)),
-            'sp': sp,
-            'ap': ap
+            'f0': f0[:n_frames],
+            'sp': sp[:n_frames],
+            'ap': ap[:n_frames]
         }
         proto = file_io.make_SequenceExample(features, {'name': file_id})
 

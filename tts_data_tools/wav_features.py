@@ -72,10 +72,10 @@ class Wav(object):
         pad_start = np.tile(f0[0], 2)
         pad_end = np.tile(f0[-1], diff - 2)
 
-        f0 = np.concatenate((pad_start, f0, pad_end))
+        f0 = np.concatenate((pad_start, f0, pad_end)).reshape((-1, 1))
 
         num_frames = f0.shape[0]
-        f0_dim = 1
+        f0_dim = f0.shape[1]
         sp_dim = sp.shape[1]
         ap_dim = ap.shape[1]
         total_dim = f0_dim + sp_dim + ap_dim
