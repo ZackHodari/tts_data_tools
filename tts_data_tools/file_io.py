@@ -13,7 +13,7 @@ from pprint import pprint
 from scipy.io import wavfile
 
 import numpy as np
-from tensorflow import parse_single_sequence_example
+from tensorflow import parse_single_sequence_example, concat
 from tensorflow.data import TFRecordDataset
 from tensorflow.python_io import tf_record_iterator, TFRecordWriter
 from tensorflow.train import Int64List, FloatList, BytesList, \
@@ -204,16 +204,63 @@ def save_TFRecord(protos, file_path):
             writer.write(message)
 
 
-def load_dataset(file_path, context_features, sequence_features, shapes, max_examples=4096, batch_size=32):
+def load_dataset(file_path, context_features, sequence_features, shapes, input_keys, target_keys,
+                 max_examples=4096, batch_size=32):
+    """Loads a TFRecord and parses the protos into a Tensorflow dataset, also shuffles and batches the data.
+
+    Usage:
+    ```
+        input_context_features = {
+            'name': tf.FixedLenFeature((), tf.string)
+        }
+
+        input_sequence_features = {
+            'lab': tf.FixedLenSequenceFeature(shape=[425], dtype=tf.float32),
+            'f0': tf.FixedLenSequenceFeature(shape=[1], dtype=tf.float32),
+        }
+
+        input_shapes = {
+            'name': [],
+            'lab': [None, 425],
+            'f0': [None, 1],
+        }
+
+        input_ids = ['name', 'lab', 'f0']
+        target_ids = ['f0']
+
+        train_dataset = load_dataset(file_path, context_features, sequence_features, shapes, input_ids, target_ids)
+    ```
+
+    Args:
+        file_path (str): The name of the TFRecord file to load protos from.
+        context_features (dict<str,feature_lens>): A dict containing sentence-level feature length specifications.
+        sequence_features (dict<str,feature_lens>): A dict containing sequential feature length specifications.
+        shapes (dict<list<int>>): A dict containing shape specifications.
+        input_keys (list<str>): A list of keys that identify the features to be used as inputs.
+        target_keys (list<str>): A list of keys that identify the features to be used as targets.
+        max_examples (int): If specified, the dataset will be shuffled using `max_examples` samples of the full dataset.
+        batch_size (int): Number of items in a batch.
+
+    Return:
+        (tf.data.TFRecordDataset) The padded and batched dataset.
+    """
     raw_dataset = TFRecordDataset(file_path)
 
     def _parse_proto(proto):
         context_dict, features_dict = parse_single_sequence_example(proto, context_features, sequence_features)
-        return context_dict, features_dict
+        features_dict.update(context_dict)
+        inputs = {key: features_dict[key] for key in input_keys}
+        # targets = {key: features_dict[key] for key in target_keys}
+        targets = concat([features_dict[key] for key in target_keys], axis=-1)
+        return inputs, targets
+
+    input_shapes = {key: shapes[key] for key in input_keys}
+    # target_shapes = {key: shapes[key] for key in target_keys}
+    target_shapes = [None, sum(shapes[key][1] for key in target_keys)]
 
     dataset = raw_dataset.map(_parse_proto)
     dataset.shuffle(max_examples)
-    dataset.padded_batch(batch_size, padded_shapes=shapes)
+    dataset.padded_batch(batch_size, padded_shapes=(input_shapes, target_shapes))
     dataset.repeat()
     return dataset
 
