@@ -13,11 +13,7 @@ from pprint import pprint
 from scipy.io import wavfile
 
 import numpy as np
-from tensorflow import parse_single_sequence_example, concat
-from tensorflow.data import TFRecordDataset
-from tensorflow.python_io import tf_record_iterator, TFRecordWriter
-from tensorflow.train import Int64List, FloatList, BytesList, \
-    Feature, Features, FeatureList, FeatureLists, SequenceExample
+import tensorflow as tf
 
 
 FileEncodingEnum = Enum("FileEncodingEnum", ("PROTO", "BIN", "TXT"))
@@ -65,21 +61,21 @@ def make_SequenceExample(data, context=None):
     def vector_to_Feature(vector):
         """Creates a `tf.train.Feature` proto."""
         if isinstance(vector, np.ndarray) and np.issubdtype(vector.dtype, np.integer):
-            return Feature(int64_list=Int64List(value=vector))
+            return tf.train.Feature(int64_list=tf.train.Int64List(value=vector))
         elif isinstance(vector, np.ndarray) and np.issubdtype(vector.dtype, np.floating):
-            return Feature(float_list=FloatList(value=vector))
+            return tf.train.Feature(float_list=tf.train.FloatList(value=vector))
         else:
-            return Feature(bytes_list=BytesList(value=[bytes(vector, 'utf8')]))
+            return tf.train.Feature(bytes_list=tf.train.BytesList(value=[bytes(vector, 'utf8')]))
 
     def vectors_to_FeatureList(vectors):
         """Creates a `tf.train.FeatureList` proto."""
-        return FeatureList(feature=[
+        return tf.train.FeatureList(feature=[
             vector_to_Feature(vector) for vector in vectors
         ])
 
     def data_to_FeatureLists(dictionary):
         """Creates a `tf.train.FeatureLists` proto."""
-        return FeatureLists(
+        return tf.train.FeatureLists(
             feature_list={
                 key: vectors_to_FeatureList(vectors) for key, vectors in dictionary.items()
             }
@@ -87,7 +83,7 @@ def make_SequenceExample(data, context=None):
 
     def context_to_Features(dictionary):
         """Creates a `tf.train.Features` proto."""
-        return Features(
+        return tf.train.Features(
             feature={
                 key: vector_to_Feature(vector) for key, vector in dictionary.items()
             }
@@ -95,8 +91,8 @@ def make_SequenceExample(data, context=None):
 
     if context is None:
         context = {}
-    return SequenceExample(feature_lists=data_to_FeatureLists(data),
-                           context=context_to_Features(context))
+    return tf.train.SequenceExample(feature_lists=data_to_FeatureLists(data),
+                                    context=context_to_Features(context))
 
 
 def load_lines(file_path):
@@ -158,7 +154,7 @@ def load_proto(file_path):
     with open(file_path, 'rb') as f:
         message = f.read()
 
-    return SequenceExample.FromString(message)
+    return tf.train.SequenceExample.FromString(message)
 
 
 def save_proto(proto, file_path):
@@ -182,11 +178,11 @@ def load_TFRecord(file_path):
 
     Returns:
         (list<tf.train.SequenceExample>) List of protos containing data for each feature."""
-    record_iterator = tf_record_iterator(path=file_path)
+    record_iterator = tf.python_io.tf_record_iterator(path=file_path)
 
     protos = []
     for message in record_iterator:
-        proto = SequenceExample.FromString(message)
+        proto = tf.train.SequenceExample.FromString(message)
         protos.append(proto)
 
     return protos
@@ -198,7 +194,7 @@ def save_TFRecord(protos, file_path):
     Args:
         protos (list<tf.train.SequenceExample>) List of SequenceExample protos.
         file_path (str): File to load the data from."""
-    with TFRecordWriter(file_path) as writer:
+    with tf.python_io.TFRecordWriter(file_path) as writer:
         for proto in protos:
             message = proto.SerializeToString()
             writer.write(message)
@@ -244,24 +240,33 @@ def load_dataset(file_path, context_features, sequence_features, shapes, input_k
     Return:
         (tf.data.TFRecordDataset) The padded and batched dataset.
     """
-    raw_dataset = TFRecordDataset(file_path)
+    raw_dataset = tf.data.TFRecordDataset(file_path)
 
     def _parse_proto(proto):
-        context_dict, features_dict = parse_single_sequence_example(proto, context_features, sequence_features)
+        context_dict, features_dict = tf.parse_single_sequence_example(proto, context_features, sequence_features)
         features_dict.update(context_dict)
         inputs = {key: features_dict[key] for key in input_keys}
         # targets = {key: features_dict[key] for key in target_keys}
-        targets = concat([features_dict[key] for key in target_keys], axis=-1)
+        targets = tf.concat([features_dict[key] for key in target_keys], axis=-1)
+
+        # TODO(zackhodari): Add mean-variance normalisation to dataset.
         return inputs, targets
 
     input_shapes = {key: shapes[key] for key in input_keys}
     # target_shapes = {key: shapes[key] for key in target_keys}
     target_shapes = [None, sum(shapes[key][1] for key in target_keys)]
 
+    def _seq_len(inputs, targets):
+        inputs['seq_len'] = tf.shape(inputs[input_keys[0]])[0]
+        return inputs, targets
+    input_shapes['seq_len'] = []
+
     dataset = raw_dataset.map(_parse_proto)
-    dataset.shuffle(max_examples)
-    dataset.padded_batch(batch_size, padded_shapes=(input_shapes, target_shapes))
-    dataset.repeat()
+    dataset = dataset.map(_seq_len)
+    dataset = dataset.shuffle(max_examples)
+    dataset = dataset.padded_batch(batch_size, padded_shapes=(input_shapes, target_shapes))
+    dataset = dataset.repeat()
+
     return dataset
 
 
