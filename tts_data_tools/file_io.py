@@ -206,11 +206,11 @@ def load_dataset(file_path, context_features, sequence_features, shapes, input_k
 
     Usage:
     ```
-        input_context_features = {
+        context_features = {
             'name': tf.FixedLenFeature((), tf.string)
         }
 
-        input_sequence_features = {
+        sequence_features = {
             'lab': tf.FixedLenSequenceFeature(shape=[425], dtype=tf.float32),
             'f0': tf.FixedLenSequenceFeature(shape=[1], dtype=tf.float32),
         }
@@ -221,10 +221,10 @@ def load_dataset(file_path, context_features, sequence_features, shapes, input_k
             'f0': [None, 1],
         }
 
-        input_ids = ['name', 'lab', 'f0']
-        target_ids = ['f0']
+        input_keys = ['name', 'lab', 'f0']
+        target_keys = ['f0']
 
-        train_dataset = load_dataset(file_path, context_features, sequence_features, shapes, input_ids, target_ids)
+        train_dataset = load_dataset(file_path, context_features, sequence_features, shapes, input_keys, target_keys)
     ```
 
     Args:
@@ -256,8 +256,9 @@ def load_dataset(file_path, context_features, sequence_features, shapes, input_k
     # target_shapes = {key: shapes[key] for key in target_keys}
     target_shapes = [None, sum(shapes[key][1] for key in target_keys)]
 
+    # Store the length of each input sample, this must be done before applying padding within `dataset.padded_batch`.
     def _seq_len(inputs, targets):
-        inputs['seq_len'] = tf.shape(inputs[input_keys[0]])[0]
+        inputs['seq_len'] = tf.shape(targets)[0]
         return inputs, targets
     input_shapes['seq_len'] = []
 
