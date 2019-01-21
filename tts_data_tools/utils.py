@@ -85,7 +85,7 @@ def singlethread(func):
     return wrapper
 
 
-def get_file_ids(file_dir, id_list=None):
+def get_file_ids(file_dir=None, id_list=None):
     """Determines the basenames of all files to be processed, using id_list of `os.listdir`.
 
     Args:
