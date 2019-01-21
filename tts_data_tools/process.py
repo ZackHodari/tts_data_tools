@@ -50,7 +50,7 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
     file_ids = utils.get_file_ids(lab_dir, id_list)
     _file_ids = utils.get_file_ids(wav_dir, id_list)
 
-    if file_ids != _file_ids:
+    if len(file_ids) != len(_file_ids) or sorted(file_ids) != sorted(_file_ids):
         raise ValueError("Please provide id_list, or ensure that wav_dir and lab_dir contain the same files.")
 
     os.makedirs(out_dir, exist_ok=True)
