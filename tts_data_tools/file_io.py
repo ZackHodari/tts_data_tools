@@ -104,7 +104,7 @@ def load_lines(file_path):
     Returns:
         (list<str>) Sequence of strings."""
     with open(file_path, 'r') as f:
-        lines = list(map(str.strip, f.readlines()))
+        lines = list(filter(bool, map(str.strip, f.readlines())))
 
     return lines
 
@@ -308,8 +308,7 @@ def load_txt(file_path):
 
     Returns:
         (np.ndarray) Sequence of frame-level vectors/floats/ints."""
-    with open(file_path, 'r') as f:
-        lines = list(map(str.strip, f.readlines()))
+    lines = load_lines(file_path)
 
     if 'E' in lines[0]:
         dtype = np.float32
