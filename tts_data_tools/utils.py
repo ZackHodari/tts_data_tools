@@ -54,13 +54,16 @@ def multithread(func):
     """
     @wraps(func)
     def wrapper(args_list):
+        results = []
         pool = ThreadPool()
         with tqdm_redirect_std() as orig_stdout:
-            for _ in tqdm(pool.imap_unordered(func, args_list), total=len(args_list),
-                          file=orig_stdout, dynamic_ncols=True):
-                pass
+            for result in tqdm(pool.imap_unordered(func, args_list), total=len(args_list),
+                               file=orig_stdout, dynamic_ncols=True):
+                results.append(result)
         pool.close()
         pool.join()
+
+        return results
 
     return wrapper
 
@@ -78,9 +81,13 @@ def singlethread(func):
     """
     @wraps(func)
     def wrapper(args_list):
+        results = []
         with tqdm_redirect_std() as orig_stdout:
             for args in tqdm(args_list, file=orig_stdout, dynamic_ncols=True):
-                func(args)
+                result = func(args)
+                results.append(result)
+
+        return results
 
     return wrapper
 
