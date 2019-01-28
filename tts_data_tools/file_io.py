@@ -258,9 +258,9 @@ def load_dataset(file_path, context_features, sequence_features, shapes, input_k
 
     # Store the length of each input sample, this must be done before applying padding within `dataset.padded_batch`.
     def _seq_len(inputs, targets):
-        inputs['seq_len'] = tf.shape(targets)[0]
+        inputs['seq_len'] = tf.expand_dims(tf.shape(targets)[0], axis=-1)
         return inputs, targets
-    input_shapes['seq_len'] = []
+    input_shapes['seq_len'] = [1]
 
     dataset = raw_dataset.map(_parse_proto)
     dataset = dataset.map(_seq_len)
