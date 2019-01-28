@@ -205,6 +205,8 @@ def load_dataset(file_path, context_features, sequence_features, shapes, input_k
                  max_examples=4096, batch_size=32):
     """Loads a TFRecord and parses the protos into a Tensorflow dataset, also shuffles and batches the data.
 
+    NOTE: This function automatically adds the features `seq_len` from the proto. `seq_len` has shape [batch_size, 1].
+
     Usage:
     ```
         context_features = {
@@ -243,6 +245,11 @@ def load_dataset(file_path, context_features, sequence_features, shapes, input_k
     """
     raw_dataset = tf.data.TFRecordDataset(file_path)
 
+    # Add sequence length to inputs as this will always be required.
+    context_features['seq_len'] = tf.FixedLenFeature((1,), tf.int64)
+    shapes['seq_len'] = [1]
+    input_keys = list(input_keys) + ['seq_len']
+
     def _parse_proto(proto):
         context_dict, features_dict = tf.parse_single_sequence_example(proto, context_features, sequence_features)
         features_dict.update(context_dict)
@@ -257,14 +264,7 @@ def load_dataset(file_path, context_features, sequence_features, shapes, input_k
     # target_shapes = {key: shapes[key] for key in target_keys}
     target_shapes = [None, sum(shapes[key][1] for key in target_keys)]
 
-    # Store the length of each input sample, this must be done before applying padding within `dataset.padded_batch`.
-    def _seq_len(inputs, targets):
-        inputs['seq_len'] = tf.expand_dims(tf.shape(targets)[0], axis=-1)
-        return inputs, targets
-    input_shapes['seq_len'] = [1]
-
     dataset = raw_dataset.map(_parse_proto)
-    dataset = dataset.map(_seq_len)
     dataset = dataset.shuffle(max_examples)
     dataset = dataset.padded_batch(batch_size, padded_shapes=(input_shapes, target_shapes))
     dataset = dataset.repeat()

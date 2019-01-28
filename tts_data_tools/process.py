@@ -9,6 +9,7 @@ Usage:
 """
 
 import argparse
+import numpy as np
 import os
 
 from . import file_io
@@ -78,7 +79,11 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
             'sp': sp[:n_frames],
             'ap': ap[:n_frames]
         }
-        proto = file_io.make_SequenceExample(features, {'name': file_id})
+        context = {
+            'name': file_id,
+            'seq_len': np.array([n_frames])
+        }
+        proto = file_io.make_SequenceExample(features, context)
 
         feature_path = os.path.join(out_dir, '{}.proto'.format(file_id))
         file_io.save_proto(proto, feature_path)
