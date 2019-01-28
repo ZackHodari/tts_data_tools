@@ -194,6 +194,7 @@ def save_TFRecord(protos, file_path):
     Args:
         protos (list<tf.train.SequenceExample>) List of SequenceExample protos.
         file_path (str): File to load the data from."""
+    # TODO(zackhodari): Add sharding.
     with tf.python_io.TFRecordWriter(file_path) as writer:
         for proto in protos:
             message = proto.SerializeToString()
