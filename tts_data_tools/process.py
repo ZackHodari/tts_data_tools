@@ -212,10 +212,11 @@ def calclate_mvn_parameters(protos, mvn_file_path, mvn_keys=('f0', 'sp', 'ap')):
 
         mean = np.sum(feature, axis=0) / n_frames
         variance = np.sum((feature - mean) ** 2, axis=0) / n_frames
+        std_dev = np.sqrt(variance)
 
         mvn_params[feature_name] = {
             'mean': mean.tolist(),
-            'variance': variance.tolist()
+            'std_dev': std_dev.tolist()
         }
 
     file_io.save_json(mvn_params, mvn_file_path)
