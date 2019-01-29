@@ -267,6 +267,7 @@ def load_dataset(file_path, context_features, sequence_features, shapes, input_k
     dataset = raw_dataset.map(_parse_proto)
     dataset = dataset.shuffle(max_examples)
     dataset = dataset.padded_batch(batch_size, padded_shapes=(input_shapes, target_shapes))
+    dataset = dataset.prefetch(batch_size * 8)
     dataset = dataset.repeat()
 
     return dataset
