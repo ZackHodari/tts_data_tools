@@ -165,12 +165,9 @@ def load_TFRecord(file_path):
         (list<tf.train.SequenceExample>) List of protos containing data for each feature."""
     record_iterator = tf_record_iterator(path=file_path)
 
-    protos = []
     for message in record_iterator:
         proto = SequenceExample.FromString(message)
-        protos.append(proto)
-
-    return protos
+        yield proto
 
 
 def save_TFRecord(protos, file_path):
