@@ -193,25 +193,39 @@ def calclate_mvn_parameters(protos, mvn_file_path, mvn_keys=('f0', 'sp', 'ap')):
     """Calculates the mean-variance normalisation statistics from a list of SequenceExample protos.
 
     Args:
+        protos (list<tf.SequenceExample> or generator): A list of protos. If the dataset is large then use a generator.
         mvn_file_path (str): File to save the mean-variance normalisation parameters to.
         mvn_keys (list<str>): Names of the features to calculate mean-variance normalisation parameters for.
     """
-    features = {}
+    sums = {}
+    sum_squares = {}
+    counts = {}
+    # Iterate through protos, accumulating information; since concatenating all data in memory may not be possible.
     for proto in protos:
-        data, _ = proto_ops.SequenceExample_to_arrays(proto)
-        for key, array in data.items():
-            if key not in features:
-                features[key] = array
-            else:
-                features[key] = np.concatenate((features[key], array), axis=0)
+        data, context = proto_ops.SequenceExample_to_arrays(proto)
+
+        for feature_name in mvn_keys:
+            feature = data[feature_name]
+
+            if feature_name not in sums:
+                sums[feature_name] = np.zeros(feature.shape[1:], dtype=np.float32)
+            if feature_name not in sum_squares:
+                sum_squares[feature_name] = np.zeros(feature.shape[1:], dtype=np.float32)
+            if feature_name not in counts:
+                counts[feature_name] = np.array([0], dtype=np.int32)
+
+            sums[feature_name] += np.sum(feature, axis=0)
+            sum_squares[feature_name] += np.sum(feature ** 2, axis=0)
+            counts[feature_name] += context['seq_len']
 
     mvn_params = {}
     for feature_name in mvn_keys:
-        feature = features[feature_name]
-        n_frames = feature.shape[0]
+        sum_x = sums[feature_name]
+        sum_square_x = sum_squares[feature_name]
+        count_x = counts[feature_name]
 
-        mean = np.sum(feature, axis=0) / n_frames
-        variance = np.sum((feature - mean) ** 2, axis=0) / n_frames
+        mean = sum_x / count_x
+        variance = (sum_square_x - (sum_x ** 2) / count_x) / count_x
         std_dev = np.sqrt(variance)
 
         mvn_params[feature_name] = {
