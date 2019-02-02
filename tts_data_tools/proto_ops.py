@@ -133,7 +133,6 @@ def load_dataset(file_path, context_features, sequence_features, shapes, input_k
         # targets = {key: features_dict[key] for key in target_keys}
         targets = tf.concat([features_dict[key] for key in target_keys], axis=-1)
 
-        # TODO(zackhodari): Add mean-variance normalisation to dataset.
         return inputs, targets
 
     input_shapes = {key: shapes[key] for key in input_keys}

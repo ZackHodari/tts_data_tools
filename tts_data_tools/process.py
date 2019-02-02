@@ -82,7 +82,8 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
         }
         context = {
             'name': file_id,
-            'seq_len': np.array([n_frames])
+            'n_frames': np.array(n_frames),
+            'n_phones': np.array(len(label.phones))
         }
         proto = proto_ops.arrays_to_SequenceExample(features, context)
 
