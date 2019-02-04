@@ -82,8 +82,8 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
         }
         context = {
             'name': file_id,
-            'n_frames': np.array(n_frames),
-            'n_phones': np.array(len(label.phones))
+            'n_frames': np.array([n_frames]),
+            'n_phones': np.array([len(label.phones)])
         }
         proto = proto_ops.arrays_to_SequenceExample(features, context)
 
@@ -217,7 +217,7 @@ def calclate_mvn_parameters(protos, mvn_file_path, mvn_keys=('f0', 'sp', 'ap')):
 
             sums[feature_name] += np.sum(feature, axis=0)
             sum_squares[feature_name] += np.sum(feature ** 2, axis=0)
-            counts[feature_name] += context['seq_len']
+            counts[feature_name] += context['n_frames']
 
     mvn_params = {}
     for feature_name in mvn_keys:

@@ -81,7 +81,7 @@ def load_dataset(file_path, context_features, sequence_features, shapes, input_k
                  max_examples=4096, batch_size=32):
     """Loads a TFRecord and parses the protos into a Tensorflow dataset, also shuffles and batches the data.
 
-    NOTE: This function automatically adds the features `seq_len` from the proto. `seq_len` has shape [batch_size, 1].
+    NOTE: This function automatically adds the `n_frames` & `n_phones` from the proto, both have shape [batch_size, 1].
 
     Usage:
     ```
@@ -121,10 +121,12 @@ def load_dataset(file_path, context_features, sequence_features, shapes, input_k
     """
     raw_dataset = tf.data.TFRecordDataset(file_path)
 
-    # Add sequence length to inputs as this will always be required.
-    context_features['seq_len'] = tf.FixedLenFeature((1,), tf.int64)
-    shapes['seq_len'] = [1]
-    input_keys = list(input_keys) + ['seq_len']
+    # Add sequence lengths to inputs as these will always be required.
+    context_features['n_frames'] = tf.FixedLenFeature((1,), tf.int64)
+    context_features['n_phones'] = tf.FixedLenFeature((1,), tf.int64)
+    shapes['n_frames'] = [1]
+    shapes['n_phones'] = [1]
+    input_keys = list(input_keys) + ['n_frames', 'n_phones']
 
     def _parse_proto(proto):
         context_dict, features_dict = tf.parse_single_sequence_example(proto, context_features, sequence_features)

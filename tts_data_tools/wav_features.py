@@ -55,7 +55,7 @@ class Wav(object):
         """Extracts REAPER's f0 and WORLDS segmental features. Ensures they are the same number of frames.
 
         Returns:
-            (np.ndarray[n_frames]): fundamental frequency,
+            (np.ndarray[n_frames, 1]): fundamental frequency,
             (np.ndarray[n_frames, sp_dim]): smoothed spectrogram,
             (np.ndarray[n_frames, ap_dim]): aperiodicity.
         """
