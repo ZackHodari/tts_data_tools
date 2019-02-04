@@ -19,7 +19,7 @@ def arrays_to_SequenceExample(data, context=None):
         elif isinstance(vector, np.ndarray) and np.issubdtype(vector.dtype, np.floating):
             return tf.train.Feature(float_list=tf.train.FloatList(value=vector))
         else:
-            return tf.train.Feature(bytes_list=tf.train.BytesList(value=[bytes(vector, 'utf8')]))
+            return tf.train.Feature(bytes_list=tf.train.BytesList(value=[bytes(vector.item(), 'utf8')]))
 
     def vectors_to_FeatureList(vectors):
         """Creates a `tf.train.FeatureList` proto."""
