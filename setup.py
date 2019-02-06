@@ -15,5 +15,5 @@ setup(
                                      'question_sets/questions-japanese.hed']},
     entry_points={'console_scripts': ['tdt_process = tts_data_tools.process:main',
                                       'tdt_file_io = tts_data_tools.file_io:main',
-                                      'tdt_lab_features = tts_data_tools.lan_features:main',
+                                      'tdt_lab_features = tts_data_tools.lab_features:main',
                                       'tdt_wav_features = tts_data_tools.wav_features:main']})
