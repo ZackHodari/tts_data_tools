@@ -502,26 +502,27 @@ class Label(object):
 
         return state_level_durations, phone_level_durations
 
-    def normalise(self, question_set, subphone_feature_set, upsample_to_frame_level=True):
+    def normalise(self, question_set, subphone_feature_set=None, upsample_to_frame_level=True):
         """Queries the labels using the question set, calculates any additional features, and returns vectorised labels.
 
         Args:
             question_set (QuestionSet instance): Question set used to query the labels.
             subphone_feature_set (SubphoneFeatureSet instance): Container that defines the subphone features to be
-                extracted from the durations. If None, then no additional frame-level features are added.
-            upsample_to_frame_level (bool): If True, upsamples phone-level features to frame-level, and subphone counter
-                features are added per frame using `subphone_feature_set`. If False, `subphone_feature_set` is ignored.
+                extracted from the durations. If None, then no additional frame-level features are created.
+            upsample_to_frame_level (bool): If True, upsamples phone-level features to frame-level.
 
         Returns:
             (np.ndarray): Numerical labels suitable for machine learning."""
         # Accumulator array used to add frame-level vectors to.
         frame_level_vectors = []
+        phone_level_vectors = []
 
         for label, phone_duration in zip(self.labels, self.state_in_phone_durations):
             # Get the numerical label once for each phone using the question set.
             label_vector = question_set.query(label)
+            phone_level_vectors.append(label_vector)
 
-            if upsample_to_frame_level:
+            if subphone_feature_set is not None:
                 frames_in_phone = sum(phone_duration)
 
                 # Track the frame counter per phone, so we don't reset it after each iteration of the inner loop.
@@ -534,20 +535,29 @@ class Label(object):
                             frame_index, frame_index_in_phone, state_index, frames_in_state, frames_in_phone,
                             self.states_per_phone)
 
-                        # Add the phone-level label and the frame-level counters to our accumulator array.
-                        frame_level_vectors.append(np.concatenate((label_vector, subphone_features)))
+                        if upsample_to_frame_level:
+                            # Add the phone-level label to the frame-level accumulator array.
+                            subphone_features = np.concatenate((label_vector, subphone_features))
+
+                        # Add the frame-level counters to our accumulator array.
+                        frame_level_vectors.append(subphone_features)
                         frame_index_in_phone += 1
-            else:
-                frame_level_vectors.append(label_vector)
 
-        number_of_frames = len(frame_level_vectors)
-        question_set_dim = np.array(label_vector).shape[0]
-        suphone_feature_dim = np.array(subphone_features).shape[0]
-        total_dimensionality = np.array(frame_level_vectors[0]).shape[0]
-        print("Numerical labels created: {} frames; {} question features; {} subphone counter features; and {} total "
-              "features.".format(number_of_frames, question_set_dim, suphone_feature_dim, total_dimensionality))
+        phone_level_vectors = np.array(phone_level_vectors, dtype=np.float32)
+        frame_level_vectors = np.array(frame_level_vectors, dtype=np.float32)
 
-        return np.array(frame_level_vectors, dtype=np.float32)
+        n_phones = len(phone_level_vectors)
+        n_frames = len(frame_level_vectors)
+        lab_dim = np.array(label_vector).shape[0]
+        count_dim = np.array(subphone_features).shape[0] - lab_dim
+
+        print("Numerical labels created: {} phones; {} frames; {} question features; {} subphone counter features."
+              .format(n_phones, n_frames, lab_dim, count_dim))
+
+        if subphone_feature_set is None:
+            return phone_level_vectors
+        else:
+            return phone_level_vectors, frame_level_vectors
 
 
 def main():
@@ -563,8 +573,9 @@ def main():
     questions = QuestionSet(args.question_file)
     suphone_features = SubphoneFeatureSet(args.subphone_feat_type)
 
-    numerical_labels = label.normalise(questions, suphone_features)
-    save_bin(numerical_labels, args.out_file)
+    numerical_labels, counter_features = label.normalise(questions, suphone_features)
+
+    save_bin(counter_features, args.out_file)
 
 
 if __name__ == "__main__":
