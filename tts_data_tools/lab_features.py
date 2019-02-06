@@ -549,7 +549,11 @@ class Label(object):
         n_phones = len(phone_level_vectors)
         n_frames = len(frame_level_vectors)
         lab_dim = np.array(label_vector).shape[0]
-        count_dim = np.array(subphone_features).shape[0] - lab_dim
+
+        if subphone_feature_set is not None:
+            count_dim = np.array(subphone_features).shape[0] - lab_dim
+        else:
+            count_dim = 'no'
 
         print("Numerical labels created: {} phones; {} frames; {} question features; {} subphone counter features."
               .format(n_phones, n_frames, lab_dim, count_dim))
@@ -573,9 +577,13 @@ def main():
     questions = QuestionSet(args.question_file)
     suphone_features = SubphoneFeatureSet(args.subphone_feat_type)
 
-    numerical_labels, counter_features = label.normalise(questions, suphone_features)
+    if args.subphone_feat_type is None:
+        numerical_labels = label.normalise(questions, upsample_to_frame_level=False)
+        save_bin(numerical_labels, args.out_file)
+    else:
+        numerical_labels, counter_features = label.normalise(questions, suphone_features)
+        save_bin(counter_features, args.out_file)
 
-    save_bin(counter_features, args.out_file)
 
 
 if __name__ == "__main__":
