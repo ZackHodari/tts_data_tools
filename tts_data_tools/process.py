@@ -33,7 +33,7 @@ def add_arguments(parser):
 
 
 def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file, subphone_feat_type):
-    """Processes label and wave files in id_list, saves the numerical labels and vocoder features to a protobuffer.
+    """Processes label and wave files in id_list, saves the numerical labels and vocoder features to .npy binary files.
 
     Args:
         lab_dir (str): Directory containing the label files.
@@ -46,8 +46,7 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
                 questions-radio_dnn_416.hed
                 questions-mandarin.hed
                 questions-japanese.hed
-        subphone_feat_type (str): Subphone features to be extracted from the durations. If None, then no additional
-            frame-level features are added.
+        subphone_feat_type (str): Subphone features to be extracted from the durations. If None, will be ignored.
         """
     file_ids = utils.get_file_ids(lab_dir, id_list)
     _file_ids = utils.get_file_ids(wav_dir, id_list)
@@ -57,40 +56,70 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
 
     os.makedirs(out_dir, exist_ok=True)
 
+    os.makedirs(os.path.join(out_dir, 'lab'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'dur'), exist_ok=True)
+    if subphone_feat_type is not None:
+        os.makedirs(os.path.join(out_dir, 'counts'), exist_ok=True)
+
+    os.makedirs(os.path.join(out_dir, 'f0'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'vuv'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'sp'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'ap'), exist_ok=True)
+
+    os.makedirs(os.path.join(out_dir, 'n_frames'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'n_phones'), exist_ok=True)
+
     questions = lab_features.QuestionSet(question_file)
-    suphone_features = lab_features.SubphoneFeatureSet(subphone_feat_type)
+    subphone_features = lab_features.SubphoneFeatureSet(subphone_feat_type)
 
     @utils.multithread
-    def save_lab_and_wav_to_proto(file_id):
+    def save_lab_and_wav_to_files(file_id):
         lab_path = os.path.join(lab_dir, '{}.lab'.format(file_id))
         label = lab_features.Label(lab_path, state_level)
-        numerical_labels = label.normalise(questions, suphone_features)
+
+        if subphone_feat_type is None:
+            numerical_labels = label.normalise(questions, upsample_to_frame_level=False)
+        else:
+            numerical_labels, counter_features = label.normalise(questions, subphone_features, False)
 
         wav_path = os.path.join(wav_dir, '{}.wav'.format(file_id))
         wav = wav_features.Wav(wav_path)
-        f0, sp, ap = wav.extract_features()
+        f0, vuv, sp, ap = wav.extract_features()
 
-        # Often there is a small difference in number of frames between labels and vocoder features
-        n_frames = min(numerical_labels.shape[0], f0.shape[0])
+        # Often there is a small difference in number of frames between labels and vocoder features.
+        durations = label.phone_durations
+        n_frames = sum(durations)
 
-        features = {
-            'lab': numerical_labels[:n_frames],
-            'dur': label.phone_durations.reshape((-1, 1)),
-            'f0': f0[:n_frames],
-            'sp': sp[:n_frames],
-            'ap': ap[:n_frames]
-        }
-        context = {
-            'name': file_id,
-            'n_frames': np.array([n_frames]),
-            'n_phones': np.array([len(label.phones)])
-        }
-        proto = proto_ops.arrays_to_SequenceExample(features, context)
+        if f0.shape[0] < n_frames:
+            # Remove excess durations if there is a shape mismatch.
+            while sum(durations) != f0.shape[0]:
+                # If the excess frames is more than the number of phones, the while loop will make multiple passes.
+                diff = sum(durations) - f0.shape[0]
+                # Remove 1 frame from each phone's duration starting at the end of the sequence.
+                durations[-diff:] -= 1
 
-        feature_path = os.path.join(out_dir, '{}.proto'.format(file_id))
-        file_io.save_proto(proto, feature_path)
+            n_frames = f0.shape[0]
 
-    save_lab_and_wav_to_proto(file_ids)
+        features = dict()
+
+        features['lab'] = numerical_labels[:n_frames]
+        features['dur'] = durations.reshape((-1, 1))
+        if subphone_feat_type is not None:
+            features['counters'] = counter_features
+
+        features['f0'] = f0[:n_frames]
+        features['vuv'] = vuv[:n_frames]
+        features['sp'] = sp[:n_frames]
+        features['ap'] = ap[:n_frames]
+
+        features['n_frames'] = np.array([n_frames])
+        features['n_phones'] = np.array([len(label.phones)])
+
+        for name, value in features.items():
+            path = os.path.join(out_dir, name, '{}.{}'.format(file_id, name))
+            file_io.save_bin(value, path)
+
+    save_lab_and_wav_to_files(file_ids)
 
 
 def process_lab_files(lab_dir, id_list, out_dir, state_level, question_file, subphone_feat_type):
@@ -115,7 +144,7 @@ def process_lab_files(lab_dir, id_list, out_dir, state_level, question_file, sub
     os.makedirs(os.path.join(out_dir, 'dur'), exist_ok=True)
 
     questions = lab_features.QuestionSet(question_file)
-    suphone_features = lab_features.SubphoneFeatureSet(subphone_feat_type)
+    subphone_features = lab_features.SubphoneFeatureSet(subphone_feat_type)
 
     @utils.multithread
     def save_lab_and_dur_to_files(file_id):
@@ -127,7 +156,7 @@ def process_lab_files(lab_dir, id_list, out_dir, state_level, question_file, sub
         file_io.save_txt(duration, duration_path)
 
         numerical_label_path = os.path.join(out_dir, 'lab', '{}.lab'.format(file_id))
-        numerical_labels = label.normalise(questions, suphone_features)
+        numerical_labels = label.normalise(questions, subphone_features)
         file_io.save_bin(numerical_labels, numerical_label_path)
 
     save_lab_and_dur_to_files(file_ids)
@@ -144,19 +173,21 @@ def process_wav_files(wav_dir, id_list, out_dir):
     file_ids = utils.get_file_ids(wav_dir, id_list)
 
     os.makedirs(os.path.join(out_dir, 'f0'), exist_ok=True)
-    os.makedirs(os.path.join(out_dir, 'mgc'), exist_ok=True)
-    os.makedirs(os.path.join(out_dir, 'bap'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'vuv'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'sp'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'ap'), exist_ok=True)
 
     @utils.multithread
     def save_wav_to_files(file_id):
         wav_path = os.path.join(wav_dir, '{}.wav'.format(file_id))
         wav = wav_features.Wav(wav_path)
 
-        f0, mgc, bap = wav.extract_features()
+        f0, vuv, sp, ap = wav.extract_features()
 
         file_io.save_bin(f0, os.path.join(out_dir, 'f0', '{}.f0'.format(file_id)))
-        file_io.save_bin(mgc, os.path.join(out_dir, 'mgc', '{}.mgc'.format(file_id)))
-        file_io.save_bin(bap, os.path.join(out_dir, 'bap', '{}.bap'.format(file_id)))
+        file_io.save_bin(vuv, os.path.join(out_dir, 'vuv', '{}.vuv'.format(file_id)))
+        file_io.save_bin(sp, os.path.join(out_dir, 'sp', '{}.sp'.format(file_id)))
+        file_io.save_bin(ap, os.path.join(out_dir, 'ap', '{}.ap'.format(file_id)))
 
     save_wav_to_files(file_ids)
 
