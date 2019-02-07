@@ -102,10 +102,10 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
 
         features = dict()
 
-        features['lab'] = numerical_labels[:n_frames]
+        features['lab'] = numerical_labels
         features['dur'] = durations.reshape((-1, 1))
         if subphone_feat_type is not None:
-            features['counters'] = counter_features
+            features['counters'] = counter_features[:n_frames]
 
         features['f0'] = f0[:n_frames]
         features['vuv'] = vuv[:n_frames]
