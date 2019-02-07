@@ -98,16 +98,22 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
         # Often there is a small difference in number of frames between labels and vocoder features.
         durations = label.phone_durations
         n_frames = sum(durations)
+        diff = n_frames - f0.shape[0]
 
-        if f0.shape[0] < n_frames:
-            # Remove excess durations if there is a shape mismatch.
-            while sum(durations) != f0.shape[0]:
-                # If the excess frames is more than the number of phones, the while loop will make multiple passes.
-                diff = sum(durations) - f0.shape[0]
-                # Remove 1 frame from each phone's duration starting at the end of the sequence.
-                durations[-diff:] -= 1
+        if diff > len(durations):
+            raise ValueError("Number of label frames and vocoder frames is too different for {name}\n"
+                             "\tvocoder frames {voc}\n"
+                             "\tlabel frames {lab}\n"
+                             "\tnumber of phones {phones}"
+                             .format(name=file_id, voc=f0.shape[0], lab=n_frames, phones=len(durations)))
 
+        # Remove excess durations if there is a shape mismatch.
+        if diff > 0:
+            # Remove 1 frame from each phone's duration starting at the end of the sequence.
+            durations[-diff:] -= 1
             n_frames = f0.shape[0]
+
+        assert n_frames == sum(durations)
 
         make_feature_path = lambda name: os.path.join(out_dir, name, '{}.{}'.format(file_id, name))
 
