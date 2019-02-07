@@ -30,7 +30,8 @@ def infer_file_encoding(file_ext):
 
 
 def add_arguments(parser):
-    pass
+    parser.add_argument("--feat_dim", action="store", dest="feat_dim", type=int, default=None,
+                        help="Dimensionality of the feature being loaded, required for load_bin.")
 
 
 def sanitise_array(data):
@@ -207,9 +208,9 @@ def save_bin(data, file_path):
         file_path (str): File to save the data to."""
     array = sanitise_array(data)
 
-    if isinstance(array.dtype, np.floating):
+    if np.issubdtype(array.dtype, np.floating):
         array = array.astype(np.float32)
-    elif isinstance(array.dtype, np.integer):
+    elif np.issubdtype(array.dtype, np.integer):
         array = array.astype(np.int32)
 
     array.tofile(file_path)
@@ -322,8 +323,6 @@ def main():
         "--in_file", action="store", dest="in_file", type=str, required=True, help="Input file.")
     parser.add_argument(
         "--out_file", action="store", dest="out_file", type=str, required=True, help="Output file.")
-    parser.add_argument(
-        "--feat_dim", action="store", dest="feat_dim", type=int, default=None, help="Dimensionality of binary feature.")
     add_arguments(parser)
     args = parser.parse_args()
 

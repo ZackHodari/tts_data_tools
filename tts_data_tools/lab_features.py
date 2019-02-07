@@ -29,7 +29,7 @@ SubphoneFeatureTypeEnum = Enum(
 def add_arguments(parser):
     parser.add_argument("--state_level", "-s", action="store_true", dest="state_level", default=True,
                         help="Is the label file state level (or frame level).")
-    parser.add_argument("--question_file", action="store", dest="question_file", type=str, required=True,
+    parser.add_argument("--question_file", action="store", dest="question_file", type=str, default=None,
                         help="File containing the '.hed' question set to query the labels with.")
     parser.add_argument("--subphone_feat_type", action="store", dest="subphone_feat_type", type=str, default=None,
                         help="The type of subphone counter features to add to the frame-level numerical vectors.")

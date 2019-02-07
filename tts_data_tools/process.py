@@ -14,7 +14,6 @@ import os
 
 from . import file_io
 from . import lab_features
-from . import proto_ops
 from . import utils
 from . import wav_features
 
@@ -28,6 +27,8 @@ def add_arguments(parser):
                         help="List of file ids to process (must be contained in lab_dir).")
     parser.add_argument("--out_dir", action="store", dest="out_dir", type=str, required=True, default=None,
                         help="Directory to save the output to.")
+    parser.add_argument("--feat_name", action="store", dest="feat_name", type=str, default=None,
+                        help="Name of the feature to calculate normalisation parameters for.")
     file_io.add_arguments(parser)
     lab_features.add_arguments(parser)
 
@@ -75,7 +76,7 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
     questions = lab_features.QuestionSet(question_file)
     subphone_features = lab_features.SubphoneFeatureSet(subphone_feat_type)
 
-    @utils.multithread
+    @utils.singlethread
     def save_lab_and_wav_to_files(file_id):
         lab_path = os.path.join(lab_dir, '{}.lab'.format(file_id))
         label = lab_features.Label(lab_path, state_level)
@@ -103,23 +104,35 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
 
             n_frames = f0.shape[0]
 
-        make_file_path = lambda name: os.path.join(out_dir, name, '{}.{}'.format(file_id, name))
+        make_feature_path = lambda name: os.path.join(out_dir, name, '{}.{}'.format(file_id, name))
 
         # Save linguistic features in binary .npy files.
-        file_io.save_bin(numerical_labels, make_file_path('lab'))
+        file_io.save_bin(numerical_labels, make_feature_path('lab'))
         if subphone_feat_type is not None:
-            file_io.save_bin(counter_features[:n_frames], make_file_path('counters'))
+            file_io.save_bin(counter_features[:n_frames], make_feature_path('counters'))
 
         # Save acoustic features in binary .npy files.
-        file_io.save_bin(f0[:n_frames], make_file_path('f0'))
-        file_io.save_bin(vuv[:n_frames], make_file_path('vuv'))
-        file_io.save_bin(sp[:n_frames], make_file_path('sp'))
-        file_io.save_bin(ap[:n_frames], make_file_path('ap'))
+        file_io.save_bin(f0[:n_frames], make_feature_path('f0'))
+        file_io.save_bin(vuv[:n_frames], make_feature_path('vuv'))
+        file_io.save_bin(sp[:n_frames], make_feature_path('sp'))
+        file_io.save_bin(ap[:n_frames], make_feature_path('ap'))
 
         # Save sequence length features in text files.
-        file_io.save_txt(durations, make_file_path('dur'))
-        file_io.save_txt(n_frames, make_file_path('n_frames'))
-        file_io.save_txt(len(label.phones), make_file_path('n_phones'))
+        file_io.save_txt(durations, make_feature_path('dur'))
+        file_io.save_txt(n_frames, make_feature_path('n_frames'))
+        file_io.save_txt(len(label.phones), make_feature_path('n_phones'))
+
+        # Save dimensionality of linguistic and acoustic features to text files.
+        make_dim_path = lambda name: os.path.join(out_dir, '{}.dim'.format(name))
+
+        file_io.save_txt(numerical_labels.shape[1], make_dim_path('lab'))
+        if subphone_feat_type is not None:
+            file_io.save_txt(counter_features.shape[1], make_dim_path('counters'))
+
+        file_io.save_txt(f0.shape[1], make_dim_path('f0'))
+        file_io.save_txt(vuv.shape[1], make_dim_path('vuv'))
+        file_io.save_txt(sp.shape[1], make_dim_path('sp'))
+        file_io.save_txt(ap.shape[1], make_dim_path('ap'))
 
     save_lab_and_wav_to_files(file_ids)
 
@@ -194,80 +207,50 @@ def process_wav_files(wav_dir, id_list, out_dir):
     save_wav_to_files(file_ids)
 
 
-def calclate_mvn_parameters_from_protos(protos_dir, id_list, mvn_file_path, mvn_keys=('f0', 'sp', 'ap')):
-    """Calculates the mean-variance normalisation statistics from a directory of SequenceExample protos.
+def calclate_mvn_parameters(data_dir, feat_name, id_list=None, feat_dim=None, dtype=np.float32):
+    """Calculates the mean-variance normalisation statistics from a directory of features.
 
     Args:
-        protos_dir (str): Directory containing the wave files.
+        data_dir (str): Root directory containing folders of features.
+        feat_name (str): Name of the feature to be normalised.
+        feat_dim (int): Dimensionality of the feature, required for loading from a binary file.
         id_list (str): List of proto file names to process.
         mvn_file_path (str): File to save the mean-variance normalisation parameters to.
         mvn_keys (list<str>): Names of the features to calculate mean-variance normalisation parameters for.
     """
-    file_ids = utils.get_file_ids(protos_dir, id_list)
-    get_file_path = lambda file_id: '{}/{}.proto'.format(protos_dir, file_id)
-    protos = (file_io.load_proto(get_file_path(file_id)) for file_id in file_ids)
+    feat_dir = os.path.join(data_dir, feat_name)
+    file_ids = utils.get_file_ids(feat_dir, id_list)
 
-    return calclate_mvn_parameters(protos, mvn_file_path, mvn_keys)
+    if feat_dim is None:
+        feat_dim_path = os.path.join(data_dir, '{}.dim'.format(feat_name))
+        feat_dim = file_io.load_txt(feat_dim_path).item()
 
+    sums = np.zeros(feat_dim, dtype=dtype)
+    sum_squares = np.zeros(feat_dim, dtype=dtype)
+    counts = np.zeros(feat_dim, dtype=np.int32)
 
-def calclate_mvn_parameters_from_tfrecord(tfrecord_path, mvn_file_path, mvn_keys=('f0', 'sp', 'ap')):
-    """Calculates the mean-variance normalisation statistics from a directory of SequenceExample protos.
+    for file_id in file_ids:
+        file_path = os.path.join(feat_dir, '{}.{}'.format(file_id, feat_name))
+        feature = file_io.load_bin(file_path, feat_dim=feat_dim, dtype=dtype)
 
-    Args:
-        tfrecord_path (str): Directory containing the wave files.
-        mvn_file_path (str): File to save the mean-variance normalisation parameters to.
-        mvn_keys (list<str>): Names of the features to calculate mean-variance normalisation parameters for.
-    """
-    protos = file_io.load_TFRecord(tfrecord_path)
+        sums += np.sum(feature, axis=0)
+        sum_squares += np.sum(feature ** 2, axis=0)
+        counts += feature.shape[0]
 
-    return calclate_mvn_parameters(protos, mvn_file_path, mvn_keys)
+    counts = counts.astype(dtype)
+    mean = sums / counts
+    variance = (sum_squares - (sums ** 2) / counts) / counts
+    std_dev = np.sqrt(variance)
 
+    mvn_params = {
+        'mean': mean.tolist(),
+        'std_dev': std_dev.tolist()
+    }
 
-def calclate_mvn_parameters(protos, mvn_file_path, mvn_keys=('f0', 'sp', 'ap')):
-    """Calculates the mean-variance normalisation statistics from a list of SequenceExample protos.
-
-    Args:
-        protos (list<tf.SequenceExample> or generator): A list of protos. If the dataset is large then use a generator.
-        mvn_file_path (str): File to save the mean-variance normalisation parameters to.
-        mvn_keys (list<str>): Names of the features to calculate mean-variance normalisation parameters for.
-    """
-    sums = {}
-    sum_squares = {}
-    counts = {}
-    # Iterate through protos, accumulating information; since concatenating all data in memory may not be possible.
-    for proto in protos:
-        data, context = proto_ops.SequenceExample_to_arrays(proto)
-
-        for feature_name in mvn_keys:
-            feature = data[feature_name]
-
-            if feature_name not in sums:
-                sums[feature_name] = np.zeros(feature.shape[1:], dtype=np.float32)
-            if feature_name not in sum_squares:
-                sum_squares[feature_name] = np.zeros(feature.shape[1:], dtype=np.float32)
-            if feature_name not in counts:
-                counts[feature_name] = np.array([0], dtype=np.int32)
-
-            sums[feature_name] += np.sum(feature, axis=0)
-            sum_squares[feature_name] += np.sum(feature ** 2, axis=0)
-            counts[feature_name] += context['n_frames']
-
-    mvn_params = {}
-    for feature_name in mvn_keys:
-        sum_x = sums[feature_name]
-        sum_square_x = sum_squares[feature_name]
-        count_x = counts[feature_name]
-
-        mean = sum_x / count_x
-        variance = (sum_square_x - (sum_x ** 2) / count_x) / count_x
-        std_dev = np.sqrt(variance)
-
-        mvn_params[feature_name] = {
-            'mean': mean.tolist(),
-            'std_dev': std_dev.tolist()
-        }
-
+    mvn_file_path = os.path.join(data_dir, '{}_mvn.json'.format(feat_name))
     file_io.save_json(mvn_params, mvn_file_path)
+
+    return mean, std_dev
 
 
 def main():
@@ -287,6 +270,10 @@ def main():
     elif args.wav_dir:
         process_wav_files(args.wav_dir, args.id_list, args.out_dir)
 
+    elif args.feat_name:
+        calclate_mvn_parameters(args.out_dir, args.feat_name, id_list=args.id_list, feat_dim=args.feat_dim)
+
 
 if __name__ == "__main__":
     main()
+
