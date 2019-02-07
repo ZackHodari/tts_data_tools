@@ -56,16 +56,19 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
 
     os.makedirs(out_dir, exist_ok=True)
 
+    # Linguistic feature directories.
     os.makedirs(os.path.join(out_dir, 'lab'), exist_ok=True)
-    os.makedirs(os.path.join(out_dir, 'dur'), exist_ok=True)
     if subphone_feat_type is not None:
-        os.makedirs(os.path.join(out_dir, 'counts'), exist_ok=True)
+        os.makedirs(os.path.join(out_dir, 'counters'), exist_ok=True)
 
+    # Acoustic feature directories.
     os.makedirs(os.path.join(out_dir, 'f0'), exist_ok=True)
     os.makedirs(os.path.join(out_dir, 'vuv'), exist_ok=True)
     os.makedirs(os.path.join(out_dir, 'sp'), exist_ok=True)
     os.makedirs(os.path.join(out_dir, 'ap'), exist_ok=True)
 
+    # Sequence length feature directories.
+    os.makedirs(os.path.join(out_dir, 'dur'), exist_ok=True)
     os.makedirs(os.path.join(out_dir, 'n_frames'), exist_ok=True)
     os.makedirs(os.path.join(out_dir, 'n_phones'), exist_ok=True)
 
@@ -100,24 +103,23 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
 
             n_frames = f0.shape[0]
 
-        features = dict()
+        make_file_path = lambda name: os.path.join(out_dir, name, '{}.{}'.format(file_id, name))
 
-        features['lab'] = numerical_labels
-        features['dur'] = durations.reshape((-1, 1))
+        # Save linguistic features in binary .npy files.
+        file_io.save_bin(numerical_labels, make_file_path('lab'))
         if subphone_feat_type is not None:
-            features['counters'] = counter_features[:n_frames]
+            file_io.save_bin(counter_features[:n_frames], make_file_path('counters'))
 
-        features['f0'] = f0[:n_frames]
-        features['vuv'] = vuv[:n_frames]
-        features['sp'] = sp[:n_frames]
-        features['ap'] = ap[:n_frames]
+        # Save acoustic features in binary .npy files.
+        file_io.save_bin(f0[:n_frames], make_file_path('f0'))
+        file_io.save_bin(vuv[:n_frames], make_file_path('vuv'))
+        file_io.save_bin(sp[:n_frames], make_file_path('sp'))
+        file_io.save_bin(ap[:n_frames], make_file_path('ap'))
 
-        features['n_frames'] = np.array([n_frames])
-        features['n_phones'] = np.array([len(label.phones)])
-
-        for name, value in features.items():
-            path = os.path.join(out_dir, name, '{}.{}'.format(file_id, name))
-            file_io.save_bin(value, path)
+        # Save sequence length features in text files.
+        file_io.save_txt(durations, make_file_path('dur'))
+        file_io.save_txt(n_frames, make_file_path('n_frames'))
+        file_io.save_txt(len(label.phones), make_file_path('n_phones'))
 
     save_lab_and_wav_to_files(file_ids)
 
