@@ -29,11 +29,13 @@ def add_arguments(parser):
                         help="Directory to save the output to.")
     parser.add_argument("--feat_name", action="store", dest="feat_name", type=str, default=None,
                         help="Name of the feature to calculate normalisation parameters for.")
+    parser.add_argument("--auto_calc_mvn", action="store_true", dest="auto_calc_mvn", default=False,
+                        help="Whether to automatically calculate MVN parameters after processing lab and wav files.")
     file_io.add_arguments(parser)
     lab_features.add_arguments(parser)
 
 
-def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file, subphone_feat_type):
+def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file, subphone_feat_type, calc_mvn=False):
     """Processes label and wave files in id_list, saves the numerical labels and vocoder features to .npy binary files.
 
     Args:
@@ -48,6 +50,7 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
                 questions-mandarin.hed
                 questions-japanese.hed
         subphone_feat_type (str): Subphone features to be extracted from the durations. If None, will be ignored.
+        calc_mvn (bool): If True, mean-variance normalisation parameters are calculated for acoustic features.
         """
     file_ids = utils.get_file_ids(lab_dir, id_list)
     _file_ids = utils.get_file_ids(wav_dir, id_list)
@@ -140,6 +143,13 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
 
     save_lab_and_wav_to_files(file_ids)
 
+    if calc_mvn:
+        calclate_mvn_parameters(out_dir, 'f0', id_list=id_list, dtype=np.float32)
+        calclate_mvn_parameters(out_dir, 'lf0', id_list=id_list, dtype=np.float32)
+        calclate_mvn_parameters(out_dir, 'vuv', id_list=id_list, dtype=np.float32)
+        calclate_mvn_parameters(out_dir, 'sp', id_list=id_list, dtype=np.float32)
+        calclate_mvn_parameters(out_dir, 'ap', id_list=id_list, dtype=np.float32)
+
 
 def process_lab_files(lab_dir, id_list, out_dir, state_level, question_file, subphone_feat_type):
     """Processes label files in id_list, saves the numerical labels and durations.
@@ -181,13 +191,14 @@ def process_lab_files(lab_dir, id_list, out_dir, state_level, question_file, sub
     save_lab_and_dur_to_files(file_ids)
 
 
-def process_wav_files(wav_dir, id_list, out_dir):
+def process_wav_files(wav_dir, id_list, out_dir, calc_mvn):
     """Processes wave files in id_list, saves the vocoder features to binary numpy files.
 
     Args:
         wav_dir (str): Directory containing the wave files.
         id_list (str): List of file basenames to process.
         out_dir (str): Directory to save the output to.
+        calc_mvn (bool): If True, mean-variance normalisation parameters are calculated for acoustic features.
         """
     file_ids = utils.get_file_ids(wav_dir, id_list)
 
@@ -211,6 +222,13 @@ def process_wav_files(wav_dir, id_list, out_dir):
         file_io.save_bin(ap, os.path.join(out_dir, 'ap', '{}.ap'.format(file_id)))
 
     save_wav_to_files(file_ids)
+
+    if calc_mvn:
+        calclate_mvn_parameters(out_dir, 'f0', id_list=id_list, dtype=np.float32)
+        calclate_mvn_parameters(out_dir, 'lf0', id_list=id_list, dtype=np.float32)
+        calclate_mvn_parameters(out_dir, 'vuv', id_list=id_list, dtype=np.float32)
+        calclate_mvn_parameters(out_dir, 'sp', id_list=id_list, dtype=np.float32)
+        calclate_mvn_parameters(out_dir, 'ap', id_list=id_list, dtype=np.float32)
 
 
 def calclate_mvn_parameters(data_dir, feat_name, id_list=None, feat_dim=None, dtype=np.float32):
@@ -267,14 +285,14 @@ def main():
 
     if args.lab_dir and args.wav_dir:
         process_files(args.lab_dir, args.wav_dir, args.id_list, args.out_dir, args.state_level,
-                      args.question_file, args.subphone_feat_type)
+                      args.question_file, args.subphone_feat_type, args.auto_calc_mvn)
 
     elif args.lab_dir:
         process_lab_files(args.lab_dir, args.id_list, args.out_dir, args.state_level,
                           args.question_file, args.subphone_feat_type)
 
     elif args.wav_dir:
-        process_wav_files(args.wav_dir, args.id_list, args.out_dir)
+        process_wav_files(args.wav_dir, args.id_list, args.out_dir, args.auto_calc_mvn)
 
     elif args.feat_name:
         calclate_mvn_parameters(args.out_dir, args.feat_name, id_list=args.id_list, feat_dim=args.feat_dim)
