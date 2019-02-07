@@ -64,6 +64,7 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
 
     # Acoustic feature directories.
     os.makedirs(os.path.join(out_dir, 'f0'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'lf0'), exist_ok=True)
     os.makedirs(os.path.join(out_dir, 'vuv'), exist_ok=True)
     os.makedirs(os.path.join(out_dir, 'sp'), exist_ok=True)
     os.makedirs(os.path.join(out_dir, 'ap'), exist_ok=True)
@@ -89,6 +90,7 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
         wav_path = os.path.join(wav_dir, '{}.wav'.format(file_id))
         wav = wav_features.Wav(wav_path)
         f0, vuv, sp, ap = wav.extract_features()
+        lf0 = np.log(f0)
 
         # Often there is a small difference in number of frames between labels and vocoder features.
         durations = label.phone_durations
@@ -113,6 +115,7 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
 
         # Save acoustic features in binary .npy files.
         file_io.save_bin(f0[:n_frames], make_feature_path('f0'))
+        file_io.save_bin(lf0[:n_frames], make_feature_path('lf0'))
         file_io.save_bin(vuv[:n_frames], make_feature_path('vuv'))
         file_io.save_bin(sp[:n_frames], make_feature_path('sp'))
         file_io.save_bin(ap[:n_frames], make_feature_path('ap'))
@@ -130,6 +133,7 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
             file_io.save_txt(counter_features.shape[1], make_dim_path('counters'))
 
         file_io.save_txt(f0.shape[1], make_dim_path('f0'))
+        file_io.save_txt(lf0.shape[1], make_dim_path('lf0'))
         file_io.save_txt(vuv.shape[1], make_dim_path('vuv'))
         file_io.save_txt(sp.shape[1], make_dim_path('sp'))
         file_io.save_txt(ap.shape[1], make_dim_path('ap'))
@@ -188,6 +192,7 @@ def process_wav_files(wav_dir, id_list, out_dir):
     file_ids = utils.get_file_ids(wav_dir, id_list)
 
     os.makedirs(os.path.join(out_dir, 'f0'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'lf0'), exist_ok=True)
     os.makedirs(os.path.join(out_dir, 'vuv'), exist_ok=True)
     os.makedirs(os.path.join(out_dir, 'sp'), exist_ok=True)
     os.makedirs(os.path.join(out_dir, 'ap'), exist_ok=True)
@@ -200,6 +205,7 @@ def process_wav_files(wav_dir, id_list, out_dir):
         f0, vuv, sp, ap = wav.extract_features()
 
         file_io.save_bin(f0, os.path.join(out_dir, 'f0', '{}.f0'.format(file_id)))
+        file_io.save_bin(np.log(f0), os.path.join(out_dir, 'lf0', '{}.lf0'.format(file_id)))
         file_io.save_bin(vuv, os.path.join(out_dir, 'vuv', '{}.vuv'.format(file_id)))
         file_io.save_bin(sp, os.path.join(out_dir, 'sp', '{}.sp'.format(file_id)))
         file_io.save_bin(ap, os.path.join(out_dir, 'ap', '{}.ap'.format(file_id)))
