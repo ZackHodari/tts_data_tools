@@ -80,7 +80,7 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
     questions = lab_features.QuestionSet(question_file)
     subphone_features = lab_features.SubphoneFeatureSet(subphone_feat_type)
 
-    @utils.singlethread
+    @utils.multithread
     def save_lab_and_wav_to_files(file_id):
         lab_path = os.path.join(lab_dir, '{}.lab'.format(file_id))
         label = lab_features.Label(lab_path, state_level)
