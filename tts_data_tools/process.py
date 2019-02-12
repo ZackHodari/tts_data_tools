@@ -31,6 +31,8 @@ def add_arguments(parser):
                         help="Name of the feature to calculate normalisation parameters for.")
     parser.add_argument("--auto_calc_mvn", action="store_true", dest="auto_calc_mvn", default=False,
                         help="Whether to automatically calculate MVN parameters after processing lab and wav files.")
+    parser.add_argument("--file_is_txt", action="store_true", dest="file_is_txt", default=False,
+                        help="Whether the files being loaded are in .txt files (not .npy files), used for MVN.")
     file_io.add_arguments(parser)
     lab_features.add_arguments(parser)
 
@@ -150,6 +152,7 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
     save_lab_and_wav_to_files(file_ids)
 
     if calc_mvn:
+        calclate_mvn_parameters(out_dir, 'dur', id_list=id_list, is_npy=False)
         calclate_mvn_parameters(out_dir, 'f0', id_list=id_list, dtype=np.float32)
         calclate_mvn_parameters(out_dir, 'lf0', id_list=id_list, dtype=np.float32)
         calclate_mvn_parameters(out_dir, 'vuv', id_list=id_list, dtype=np.float32)
@@ -157,7 +160,7 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
         calclate_mvn_parameters(out_dir, 'ap', id_list=id_list, dtype=np.float32)
 
 
-def process_lab_files(lab_dir, id_list, out_dir, state_level, question_file, subphone_feat_type):
+def process_lab_files(lab_dir, id_list, out_dir, state_level, question_file, subphone_feat_type, calc_mvn):
     """Processes label files in id_list, saves the numerical labels and durations.
 
     Args:
@@ -195,6 +198,9 @@ def process_lab_files(lab_dir, id_list, out_dir, state_level, question_file, sub
         file_io.save_bin(numerical_labels, numerical_label_path)
 
     save_lab_and_dur_to_files(file_ids)
+
+    if calc_mvn:
+        calclate_mvn_parameters(out_dir, 'dur', id_list=id_list, is_npy=False)
 
 
 def process_wav_files(wav_dir, id_list, out_dir, calc_mvn):
@@ -237,7 +243,7 @@ def process_wav_files(wav_dir, id_list, out_dir, calc_mvn):
         calclate_mvn_parameters(out_dir, 'ap', id_list=id_list, dtype=np.float32)
 
 
-def calclate_mvn_parameters(data_dir, feat_name, id_list=None, feat_dim=None, dtype=np.float32):
+def calclate_mvn_parameters(data_dir, feat_name, id_list=None, is_npy=True, feat_dim=None, dtype=np.float32):
     """Calculates the mean-variance normalisation statistics from a directory of features.
 
     Args:
@@ -245,6 +251,7 @@ def calclate_mvn_parameters(data_dir, feat_name, id_list=None, feat_dim=None, dt
         feat_name (str): Name of the feature to be normalised.
         feat_dim (int): Dimensionality of the feature, required for loading from a binary file.
         id_list (str): List of proto file names to process.
+        is_npy (bool): If True uses `file_io.load_bin`, otherwise uses `file_io.load_txt` to load each file.
         mvn_file_path (str): File to save the mean-variance normalisation parameters to.
         mvn_keys (list<str>): Names of the features to calculate mean-variance normalisation parameters for.
     """
@@ -252,8 +259,12 @@ def calclate_mvn_parameters(data_dir, feat_name, id_list=None, feat_dim=None, dt
     file_ids = utils.get_file_ids(feat_dir, id_list)
 
     if feat_dim is None:
-        feat_dim_path = os.path.join(data_dir, '{}.dim'.format(feat_name))
-        feat_dim = file_io.load_txt(feat_dim_path).item()
+        if is_npy:
+            feat_dim_path = os.path.join(data_dir, '{}.dim'.format(feat_name))
+            feat_dim = file_io.load_txt(feat_dim_path).item()
+        else:
+            feat_ex_path = os.path.join(feat_dir, '{}.{}'.format(file_ids[0], feat_name))
+            feat_dim = file_io.load_txt(feat_ex_path).shape[1]
 
     sums = np.zeros(feat_dim, dtype=dtype)
     sum_squares = np.zeros(feat_dim, dtype=dtype)
@@ -261,7 +272,11 @@ def calclate_mvn_parameters(data_dir, feat_name, id_list=None, feat_dim=None, dt
 
     for file_id in file_ids:
         file_path = os.path.join(feat_dir, '{}.{}'.format(file_id, feat_name))
-        feature = file_io.load_bin(file_path, feat_dim=feat_dim, dtype=dtype)
+
+        if is_npy:
+            feature = file_io.load_bin(file_path, feat_dim=feat_dim, dtype=dtype)
+        else:
+            feature = file_io.load_txt(file_path)
 
         sums += np.sum(feature, axis=0)
         sum_squares += np.sum(feature ** 2, axis=0)
@@ -295,13 +310,14 @@ def main():
 
     elif args.lab_dir:
         process_lab_files(args.lab_dir, args.id_list, args.out_dir, args.state_level,
-                          args.question_file, args.subphone_feat_type)
+                          args.question_file, args.subphone_feat_type, args.auto_calc_mvn)
 
     elif args.wav_dir:
         process_wav_files(args.wav_dir, args.id_list, args.out_dir, args.auto_calc_mvn)
 
     elif args.feat_name:
-        calclate_mvn_parameters(args.out_dir, args.feat_name, id_list=args.id_list, feat_dim=args.feat_dim)
+        calclate_mvn_parameters(args.out_dir, args.feat_name, id_list=args.id_list,
+                                is_npy=not args.file_is_txt, feat_dim=args.feat_dim)
 
 
 if __name__ == "__main__":
