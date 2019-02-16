@@ -250,7 +250,7 @@ def calclate_mvn_parameters(data_dir, feat_name, id_list=None, is_npy=True, feat
         data_dir (str): Root directory containing folders of features.
         feat_name (str): Name of the feature to be normalised.
         feat_dim (int): Dimensionality of the feature, required for loading from a binary file.
-        id_list (str): List of proto file names to process.
+        id_list (str): List of file names to process.
         is_npy (bool): If True uses `file_io.load_bin`, otherwise uses `file_io.load_txt` to load each file.
         mvn_file_path (str): File to save the mean-variance normalisation parameters to.
         mvn_keys (list<str>): Names of the features to calculate mean-variance normalisation parameters for.

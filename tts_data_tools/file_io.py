@@ -1,4 +1,4 @@
-"""Handles loading and saving to files, using protobuffers, binary files, or text files.
+"""Handles loading and saving to files, using binary files, or text files.
 
 Usage:
     python file_io.py \
@@ -12,12 +12,9 @@ import json
 from scipy.io import wavfile
 
 import numpy as np
-from tensorflow.python_io import tf_record_iterator
-from tensorflow.python_io import TFRecordWriter
-from tensorflow.train import SequenceExample
 
 
-FileEncodingEnum = Enum("FileEncodingEnum", ("PROTO", "BIN", "TXT"))
+FileEncodingEnum = Enum("FileEncodingEnum", ("BIN", "TXT"))
 
 
 def infer_file_encoding(file_ext):
@@ -124,67 +121,6 @@ def save_wav(file_path, data, sample_rate):
 
 
 #
-# Tensorflow SequenceExample protobuffers.
-#
-def load_proto(file_path):
-    """Loads data from a `tf.train.SequenceExample` proto.
-
-    Args:
-        file_path (str): File to load the data from.
-
-    Returns:
-        (`tf.train.SequenceExample`) Proto containing data for each feature."""
-    with open(file_path, 'rb') as f:
-        message = f.read()
-
-    return SequenceExample.FromString(message)
-
-
-def save_proto(proto, file_path):
-    """Converts data to a `tf.train.SequenceExample` proto, and serialises to binary.
-
-    Args:
-        data (dict<str,list<vector>>): A map of feature names to a sequence of frame-level vectors/floats/ints/string.
-        file_path (str): File to save the data to.
-        context (dict<str,vector>): A map of feature names to a vector/float/int/string."""
-    message = proto.SerializeToString()
-
-    with open(file_path, 'wb') as f:
-        f.write(message)
-
-
-#
-# Tensorflow TFRecord datasets.
-#
-def load_TFRecord(file_path):
-    """Loads a list of `tf.train.SequenceExample` protos, saved in a `TFRecord`
-
-    Args:
-        file_path (str): File to load the data from.
-
-    Returns:
-        (list<tf.train.SequenceExample>) List of protos containing data for each feature."""
-    record_iterator = tf_record_iterator(path=file_path)
-
-    for message in record_iterator:
-        proto = SequenceExample.FromString(message)
-        yield proto
-
-
-def save_TFRecord(protos, file_path):
-    """Saves a list of protos to a TFRecord, which can be used with `tf.data.TFRecordDataset`.
-
-    Args:
-        protos (list<tf.train.SequenceExample>) List of SequenceExample protos.
-        file_path (str): File to save the data to."""
-    # TODO(zackhodari): Add sharding.
-    with TFRecordWriter(file_path) as writer:
-        for proto in protos:
-            message = proto.SerializeToString()
-            writer.write(message)
-
-
-#
 # Numpy binary files.
 #
 def load_bin(file_path, feat_dim, dtype=np.float32):
@@ -272,10 +208,7 @@ def load(file_path, file_encoding=None, feat_dim=None):
         file_ext = file_path.split('.')[-1]
         file_encoding = infer_file_encoding(file_ext)
 
-    if file_encoding == FileEncodingEnum.PROTO:
-        return load_proto(file_path)
-
-    elif file_encoding == FileEncodingEnum.BIN:
+    if file_encoding == FileEncodingEnum.BIN:
         return load_bin(file_path, feat_dim)
 
     elif file_encoding == FileEncodingEnum.TXT:
@@ -290,10 +223,7 @@ def save(data, file_path, file_encoding=None):
         file_ext = file_path.split('.')[-1]
         file_encoding = infer_file_encoding(file_ext)
 
-    if file_encoding == FileEncodingEnum.PROTO:
-        save_proto(data, file_path)
-
-    elif file_encoding == FileEncodingEnum.BIN:
+    if file_encoding == FileEncodingEnum.BIN:
         save_bin(data, file_path)
 
     elif file_encoding == FileEncodingEnum.TXT:
