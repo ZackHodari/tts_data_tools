@@ -180,6 +180,8 @@ def process_lab_files(lab_dir, id_list, out_dir, state_level, question_file, sub
 
     os.makedirs(os.path.join(out_dir, 'lab'), exist_ok=True)
     os.makedirs(os.path.join(out_dir, 'dur'), exist_ok=True)
+    if subphone_feat_type is not None:
+        os.makedirs(os.path.join(out_dir, 'counters'), exist_ok=True)
 
     questions = lab_features.QuestionSet(question_file)
     subphone_features = lab_features.SubphoneFeatureSet(subphone_feat_type)
@@ -193,9 +195,17 @@ def process_lab_files(lab_dir, id_list, out_dir, state_level, question_file, sub
         duration = label.phone_durations
         file_io.save_txt(duration, duration_path)
 
+        if subphone_feat_type is None:
+            numerical_labels = label.normalise(questions, upsample_to_frame_level=False)
+        else:
+            numerical_labels, counter_features = label.normalise(questions, subphone_features, False)
+
         numerical_label_path = os.path.join(out_dir, 'lab', '{}.lab'.format(file_id))
-        numerical_labels = label.normalise(questions, subphone_features)
         file_io.save_bin(numerical_labels, numerical_label_path)
+
+        if subphone_feat_type is not None:
+            counter_feature_path = os.path.join(out_dir, 'counters', '{}.counters'.format(file_id))
+            file_io.save_bin(counter_features, counter_feature_path)
 
     save_lab_and_dur_to_files(file_ids)
 
