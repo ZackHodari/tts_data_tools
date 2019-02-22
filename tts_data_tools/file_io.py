@@ -41,30 +41,23 @@ def add_arguments(parser):
                         help="Dimensionality of the feature being loaded, required for load_bin.")
 
 
-def load_dir(load_fn, path, feat_ext):
-    def wrapper(file_ids):
-        data = []
+def load_dir(load_fn, path, file_ids, feat_ext):
+    data = []
 
-        for file_id in file_ids:
-            file_path = os.path.join(path, '{}.{}'.format(file_id, feat_ext))
-            datum = load_fn(file_path)
-            data.append(datum)
+    for file_id in file_ids:
+        file_path = os.path.join(path, '{}.{}'.format(file_id, feat_ext))
+        datum = load_fn(file_path)
+        data.append(datum)
 
-        return data
-
-    return wrapper
+    return data
 
 
-def save_dir(save_fn, path, feat_ext):
+def save_dir(save_fn, path, data, file_ids, feat_ext):
     os.makedirs(path, exist_ok=True)
 
-    def wrapper(data, file_ids):
-        for datum, file_id in zip(data, file_ids):
-            print(datum, file_id)
-            file_path = os.path.join(path, '{}.{}'.format(file_id, feat_ext))
-            save_fn(datum, file_path)
-
-    return wrapper
+    for datum, file_id in zip(data, file_ids):
+        file_path = os.path.join(path, '{}.{}'.format(file_id, feat_ext))
+        save_fn(datum, file_path)
 
 
 def sanitise_array(data):
