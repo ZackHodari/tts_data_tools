@@ -26,6 +26,15 @@ def infer_file_encoding(file_ext):
     return FileEncodingEnum[file_ext.upper()]
 
 
+def file_encoding_enum_type(astring):
+    try:
+        return infer_file_encoding(astring)
+    except KeyError:
+        msg = ', '.join([t.name.lower() for t in FileEncodingEnum])
+        msg = 'CustomEnumType: use one of {%s}'%msg
+        raise argparse.ArgumentTypeError(msg)
+
+
 def add_arguments(parser):
     parser.add_argument("--feat_dim", action="store", dest="feat_dim", type=int, default=None,
                         help="Dimensionality of the feature being loaded, required for load_bin.")
@@ -236,17 +245,9 @@ def save(data, file_path, file_encoding=None):
 def main():
     parser = argparse.ArgumentParser(description="Script to load/save files in different encodings.")
 
-    def enumtype(astring):
-        try:
-            return infer_file_encoding(astring)
-        except KeyError:
-            msg = ', '.join([t.name.lower() for t in FileEncodingEnum])
-            msg = 'CustomEnumType: use one of {%s}'%msg
-            raise argparse.ArgumentTypeError(msg)
-
-    parser.add_argument("--in_file_encoding", action="store", dest="in_file_encoding", type=enumtype,
+    parser.add_argument("--in_file_encoding", action="store", dest="in_file_encoding", type=file_encoding_enum_type,
                         help="The encoding to load the file with.")
-    parser.add_argument("--out_file_encoding", action="store", dest="out_file_encoding", type=enumtype,
+    parser.add_argument("--out_file_encoding", action="store", dest="out_file_encoding", type=file_encoding_enum_type,
                         help="The encoding to save the file with.")
 
     parser.add_argument(
