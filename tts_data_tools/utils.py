@@ -93,7 +93,7 @@ def singlethread(func):
 
 
 def get_file_ids(file_dir=None, id_list=None):
-    """Determines the basenames of all files to be processed, using id_list of `os.listdir`.
+    """Determines basenames of files id_list or `os.listdir`, checks there are no missing files.
 
     Args:
         file_dir (str): Directory where the basenames would exist.
@@ -101,12 +101,19 @@ def get_file_ids(file_dir=None, id_list=None):
 
     Returns:
         file_ids (list<str>): Basenames of files in dir or id_list"""
-    if id_list is None:
+    if file_dir is not None:
         # Ignore hidden files starting with a period, and remove file extensions.
-        file_ids = filter(lambda f: not f.startswith('.'), os.listdir(file_dir))
-        file_ids = list(map(lambda x: os.path.splitext(x)[0], file_ids))
+        _file_ids = filter(lambda f: not f.startswith('.'), os.listdir(file_dir))
+        _file_ids = list(map(lambda x: os.path.splitext(x)[0], _file_ids))
+
+    if id_list is None:
+        file_ids = _file_ids
     else:
         file_ids = load_lines(id_list)
+
+        # Check that `file_ids` is a subset of `_file_ids`
+        if (file_dir is not None) and (not set(file_ids).issubset(_file_ids)):
+            raise ValueError("All basenames in id_list '{}' must be present in file_dir '{}'".format(id_list, file_dir))
 
     return file_ids
 
