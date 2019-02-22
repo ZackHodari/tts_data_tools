@@ -9,6 +9,7 @@ Usage:
 import argparse
 from enum import Enum
 import json
+import os
 from scipy.io import wavfile
 
 import numpy as np
@@ -38,6 +39,32 @@ def file_encoding_enum_type(astring):
 def add_arguments(parser):
     parser.add_argument("--feat_dim", action="store", dest="feat_dim", type=int, default=None,
                         help="Dimensionality of the feature being loaded, required for load_bin.")
+
+
+def load_dir(load_fn, path, feat_ext):
+    def wrapper(file_ids):
+        data = []
+
+        for file_id in file_ids:
+            file_path = os.path.join(path, '{}.{}'.format(file_id, feat_ext))
+            datum = load_fn(file_path)
+            data.append(datum)
+
+        return data
+
+    return wrapper
+
+
+def save_dir(save_fn, path, feat_ext):
+    os.makedirs(path, exist_ok=True)
+
+    def wrapper(data, file_ids):
+        for datum, file_id in zip(data, file_ids):
+            print(datum, file_id)
+            file_path = os.path.join(path, '{}.{}'.format(file_id, feat_ext))
+            save_fn(datum, file_path)
+
+    return wrapper
 
 
 def sanitise_array(data):
@@ -98,7 +125,7 @@ def save_lines(lines, file_path):
     Args:
         lines (list<str>): Sequence of strings.
         file_path (str): File to save the text to."""
-    lines = list(map(lambda x: '{}\n'.format(line) for line in lines))
+    lines = list(map(lambda x: '{}\n'.format(x), lines))
 
     with open(file_path, 'w') as f:
         f.writelines(lines)
