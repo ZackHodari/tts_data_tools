@@ -69,6 +69,7 @@ class QuestionSet(object):
             file_path (str): Question set to be loaded. Can be one of the four provided question sets;
                 questions-unilex_dnn_600.hed
                 questions-radio_dnn_416.hed
+                questions-radio_phones_48.hed
                 questions-mandarin.hed
                 questions-japanese.hed
         """

@@ -55,7 +55,7 @@ QS "C-Central_Fricative"	{-dh+,-s+,-th+,-z+}
 QS "C-Back_Fricative"		{-ch+,-jh+,-sh+,-zh+}
 QS "C-Affricate_Consonant"	{-ch+,-jh+}
 QS "C-Not_Affricate"		{-dh+,-f+,-s+,-sh+,-th+,-v+,-z+,-zh+}
-QS "C-silences"				{-pau+,-sil+,-h#+,-brth+}
+QS "C-silences"				{-pau+,-#+,-sil+,-h#+,-brth+}
 QS "C-aa"					{-aa+}
 QS "C-ae"					{-ae+}
 QS "C-ah"					{-ah+}
@@ -103,7 +103,7 @@ QS "C-w"					{-w+}
 QS "C-y"					{-y+}
 QS "C-z"					{-z+}
 QS "C-zh"					{-zh+}
-QS "C-pau"					{-pau+}
+QS "C-pau"					{-pau+,-#+}
 QS "LL-aa"					{aa^}
 QS "LL-ae"				    {ae^}
 QS "LL-ah"					{ah^}
@@ -151,7 +151,7 @@ QS "LL-w"					{w^}
 QS "LL-y"					{y^}
 QS "LL-z"					{z^}
 QS "LL-zh"					{zh^}
-QS "LL-pau"					{pau^}
+QS "LL-pau"					{pau^,#^}
 QS "L-aa"					{^aa-}
 QS "L-ae"					{^ae-}
 QS "L-ah"					{^ah-}
@@ -199,7 +199,7 @@ QS "L-w"					{^w-}
 QS "L-y"					{^y-}
 QS "L-z"					{^z-}
 QS "L-zh"					{^zh-}
-QS "L-pau"					{^pau-}
+QS "L-pau"					{^pau-,^#-}
 QS "R-aa"					{+aa=}
 QS "R-ae"					{+ae=}
 QS "R-ah"					{+ah=}
@@ -247,7 +247,7 @@ QS "R-w"					{+w=}
 QS "R-y"					{+y=}
 QS "R-z"					{+z=}
 QS "R-zh"					{+zh=}
-QS "R-pau"					{+pau=}
+QS "R-pau"					{+pau=,+#=}
 QS "RR-aa"					{=aa@}
 QS "RR-ae"					{=ae@}
 QS "RR-ah"					{=ah@}
@@ -295,7 +295,7 @@ QS "RR-w"					{=w@}
 QS "RR-y"					{=y@}
 QS "RR-z"					{=z@}
 QS "RR-zh"					{=zh@}
-QS "RR-pau"					{=pau@}
+QS "RR-pau"					{=pau@,=#@}
 QS "C-Syl_Vowel==x"			{|x/C:}
 QS "C-Syl_Vowel==no"		{|novowel/C:}
 QS "C-Syl_Vowel"			{|aa/C:,|ae/C:,|ah/C:,|ao/C:,|aw/C:,|ax/C:,|axr/C:,|ay/C:,|eh/C:,|el/C:,|em/C:,|en/C:,|er/C:,|ey/C:,|ih/C:,|ix/C:,|iy/C:,|ow/C:,|oy/C:,|uh/C:,|uw/C:}
