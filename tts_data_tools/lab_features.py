@@ -35,24 +35,6 @@ def add_arguments(parser):
                         help="The type of subphone counter features to add to the frame-level numerical vectors.")
 
 
-def hed_to_new_format(hed_file_name):
-    """Converts the question set '.hed' format to new format based on LABEL_DESCRIPTION keys.
-
-    '.hed' format:
-    QS  "C-Voiced_Plosive"  {*-b+*,*-d+*,*-g+*}
-    QS  "RR-ou1"            {*=ou1:*}
-    QS  "C-Syl_oo1"         {*|oo1/C/*}
-    CQS "Seg_Fw"            {:(\d+)_}
-
-    new format:
-    "C-Voiced_Plosive"  p3  IN      - [b,d,g]   +
-    "RR-ou1"            p5  IN      = [ou1]     @
-    "C-Syl_oo1"         b16 IN      | [oo1]     /C/
-    "Seg_Fw"            p6  VALUE   @ []        _
-    """
-    pass
-
-
 class QuestionSet(object):
     """Container for question set regexes.
 
