@@ -33,6 +33,8 @@ def add_arguments(parser):
                         help="Whether to automatically calculate MVN parameters after processing lab and wav files.")
     parser.add_argument("--file_is_txt", action="store_true", dest="file_is_txt", default=False,
                         help="Whether the files being loaded are in .txt files (not .npy files), used for MVN.")
+    parser.add_argument("--calc_mvn_deltas", action="store_true", dest="calc_mvn_deltas", default=False,
+                        help="Whether the MVN parameters for the delta and delta delta features.")
     file_io.add_arguments(parser)
     lab_features.add_arguments(parser)
 
@@ -153,11 +155,11 @@ def process_files(lab_dir, wav_dir, id_list, out_dir, state_level, question_file
 
     if calc_mvn:
         calclate_mvn_parameters(out_dir, 'dur', id_list=id_list, is_npy=False)
-        calclate_mvn_parameters(out_dir, 'f0', id_list=id_list, dtype=np.float32)
-        calclate_mvn_parameters(out_dir, 'lf0', id_list=id_list, dtype=np.float32)
-        calclate_mvn_parameters(out_dir, 'vuv', id_list=id_list, dtype=np.float32)
-        calclate_mvn_parameters(out_dir, 'sp', id_list=id_list, dtype=np.float32)
-        calclate_mvn_parameters(out_dir, 'ap', id_list=id_list, dtype=np.float32)
+        calclate_mvn_parameters(out_dir, 'f0', id_list=id_list, deltas=True, dtype=np.float32)
+        calclate_mvn_parameters(out_dir, 'lf0', id_list=id_list, deltas=True, dtype=np.float32)
+        calclate_mvn_parameters(out_dir, 'vuv', id_list=id_list, deltas=True, dtype=np.float32)
+        calclate_mvn_parameters(out_dir, 'sp', id_list=id_list, deltas=True, dtype=np.float32)
+        calclate_mvn_parameters(out_dir, 'ap', id_list=id_list, deltas=True, dtype=np.float32)
 
 
 def process_lab_files(lab_dir, id_list, out_dir, state_level, question_file, subphone_feat_type, calc_mvn):
@@ -246,14 +248,15 @@ def process_wav_files(wav_dir, id_list, out_dir, calc_mvn):
     save_wav_to_files(file_ids)
 
     if calc_mvn:
-        calclate_mvn_parameters(out_dir, 'f0', id_list=id_list, dtype=np.float32)
-        calclate_mvn_parameters(out_dir, 'lf0', id_list=id_list, dtype=np.float32)
-        calclate_mvn_parameters(out_dir, 'vuv', id_list=id_list, dtype=np.float32)
-        calclate_mvn_parameters(out_dir, 'sp', id_list=id_list, dtype=np.float32)
-        calclate_mvn_parameters(out_dir, 'ap', id_list=id_list, dtype=np.float32)
+        calclate_mvn_parameters(out_dir, 'f0', id_list=id_list, deltas=True, dtype=np.float32)
+        calclate_mvn_parameters(out_dir, 'lf0', id_list=id_list, deltas=True, dtype=np.float32)
+        calclate_mvn_parameters(out_dir, 'vuv', id_list=id_list, deltas=True, dtype=np.float32)
+        calclate_mvn_parameters(out_dir, 'sp', id_list=id_list, deltas=True, dtype=np.float32)
+        calclate_mvn_parameters(out_dir, 'ap', id_list=id_list, deltas=True, dtype=np.float32)
 
 
-def calclate_mvn_parameters(data_dir, feat_name, id_list=None, is_npy=True, feat_dim=None, dtype=np.float32):
+def calclate_mvn_parameters(data_dir, feat_name, id_list=None, deltas=False,
+                            is_npy=True, feat_dim=None, dtype=np.float32):
     """Calculates the mean-variance normalisation statistics from a directory of features.
 
     Args:
@@ -280,6 +283,10 @@ def calclate_mvn_parameters(data_dir, feat_name, id_list=None, is_npy=True, feat
     sum_squares = np.zeros(feat_dim, dtype=dtype)
     counts = np.zeros(feat_dim, dtype=np.int32)
 
+    if deltas:
+        delta_sums = np.zeros(feat_dim, dtype=dtype)
+        delta_sum_squares = np.zeros(feat_dim, dtype=dtype)
+
     for file_id in file_ids:
         file_path = os.path.join(feat_dir, '{}.{}'.format(file_id, feat_name))
 
@@ -291,6 +298,11 @@ def calclate_mvn_parameters(data_dir, feat_name, id_list=None, is_npy=True, feat
         sums += np.sum(feature, axis=0)
         sum_squares += np.sum(feature ** 2, axis=0)
         counts += feature.shape[0]
+
+        if deltas:
+            deltas = wav_features.compute_deltas(feature)
+            delta_sums += np.sum(deltas, axis=0)
+            delta_sum_squares += np.sum(deltas ** 2, axis=0)
 
     counts = counts.astype(dtype)
     mean = sums / counts
@@ -304,6 +316,20 @@ def calclate_mvn_parameters(data_dir, feat_name, id_list=None, is_npy=True, feat
 
     mvn_file_path = os.path.join(data_dir, '{}_mvn.json'.format(feat_name))
     file_io.save_json(mvn_params, mvn_file_path)
+
+    if deltas:
+        delta_mean = delta_sums / counts
+        delta_variance = (delta_sum_squares - (delta_sums ** 2) / counts) / counts
+        delta_std_dev = np.sqrt(delta_variance)
+
+        delta_mvn_params = {
+            'mean': delta_mean.tolist(),
+            'std_dev': delta_std_dev.tolist()
+        }
+
+        delta_mvn_file_path = os.path.join(data_dir, '{}_deltas_mvn.json'.format(feat_name))
+        file_io.save_json(delta_mvn_params, delta_mvn_file_path)
+
 
     return mean, std_dev
 
@@ -326,7 +352,7 @@ def main():
         process_wav_files(args.wav_dir, args.id_list, args.out_dir, args.auto_calc_mvn)
 
     elif args.feat_name:
-        calclate_mvn_parameters(args.out_dir, args.feat_name, id_list=args.id_list,
+        calclate_mvn_parameters(args.out_dir, args.feat_name, id_list=args.id_list, deltas=args.calc_mvn_deltas,
                                 is_npy=not args.file_is_txt, feat_dim=args.feat_dim)
 
 

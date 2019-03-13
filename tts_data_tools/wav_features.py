@@ -18,6 +18,32 @@ def add_arguments(parser):
     pass
 
 
+def compute_running_window(feature, window):
+    """Computing dynamic features using a window is exactly a convolution operation."""
+    # Check that the window length is odd.
+    assert len(window) % 2 == 1
+
+    # Pad the feature with the first and last frames.
+    pad_len = (len(window) - 1) // 2
+    padded_feature = np.concatenate((
+        feature[[0] * pad_len],
+        feature,
+        feature[[-1] * pad_len]))
+
+    # Ensure the window is an array and in the right shape to be used as a 1-dimensional kernel.
+    kernel_1d = np.array(window).reshape(-1, 1)
+
+    # We actually need to compute cross-correlation, not convolution, therefore we must rotate the 1-d kernel 180.
+    return convolve2d(padded_feature, kernel_1d[::-1], 'valid')
+
+
+def compute_deltas(feature):
+    velocity = tdt.wav_features.compute_deltas(feature, [-0.5, 0.0, 0.5])
+    acceleration = tdt.wav_features.compute_deltas(feature, [1., -2., 1.])
+
+    return np.concatenate((feature, velocity, acceleration), axis=1)
+
+
 class Wav(object):
     """Container for waveforms, allows for feature extraction."""
     def __init__(self, file_path):
