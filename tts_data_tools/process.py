@@ -284,8 +284,8 @@ def calclate_mvn_parameters(data_dir, feat_name, id_list=None, deltas=False,
     counts = np.zeros(feat_dim, dtype=np.int32)
 
     if deltas:
-        delta_sums = np.zeros(feat_dim, dtype=dtype)
-        delta_sum_squares = np.zeros(feat_dim, dtype=dtype)
+        delta_sums = np.zeros(feat_dim * 3, dtype=dtype)
+        delta_sum_squares = np.zeros(feat_dim * 3, dtype=dtype)
 
     for file_id in file_ids:
         file_path = os.path.join(feat_dir, '{}.{}'.format(file_id, feat_name))
@@ -300,9 +300,9 @@ def calclate_mvn_parameters(data_dir, feat_name, id_list=None, deltas=False,
         counts += feature.shape[0]
 
         if deltas:
-            deltas = wav_features.compute_deltas(feature)
-            delta_sums += np.sum(deltas, axis=0)
-            delta_sum_squares += np.sum(deltas ** 2, axis=0)
+            delta_feature = wav_features.compute_deltas(feature)
+            delta_sums += np.sum(delta_feature, axis=0)
+            delta_sum_squares += np.sum(delta_feature ** 2, axis=0)
 
     counts = counts.astype(dtype)
     mean = sums / counts

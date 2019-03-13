@@ -7,6 +7,7 @@ Usage:
 import argparse
 
 import numpy as np
+from scipy.signal import convolve2d
 
 import pyworld
 import pyreaper
@@ -38,8 +39,8 @@ def compute_running_window(feature, window):
 
 
 def compute_deltas(feature):
-    velocity = tdt.wav_features.compute_deltas(feature, [-0.5, 0.0, 0.5])
-    acceleration = tdt.wav_features.compute_deltas(feature, [1., -2., 1.])
+    velocity = compute_running_window(feature, [-0.5, 0.0, 0.5])
+    acceleration = compute_running_window(feature, [1., -2., 1.])
 
     return np.concatenate((feature, velocity, acceleration), axis=1)
 
