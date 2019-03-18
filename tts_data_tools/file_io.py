@@ -42,14 +42,10 @@ def add_arguments(parser):
 
 
 def load_dir(load_fn, path, file_ids, feat_ext):
-    data = []
-
     for file_id in file_ids:
         file_path = os.path.join(path, '{}.{}'.format(file_id, feat_ext))
         datum = load_fn(file_path)
-        data.append(datum)
-
-    return data
+        yield datum
 
 
 def save_dir(save_fn, path, data, file_ids, feat_ext):
