@@ -27,12 +27,9 @@ SubphoneFeatureTypeEnum = Enum(
 
 
 def add_arguments(parser):
-    parser.add_argument("--state_level", "-s", action="store_true", dest="state_level", default=True,
+    parser.add_argument("--state_level", dest="state_level", action="store_true", default=True,
                         help="Is the label file state level (or frame level).")
-    parser.add_argument("--question_file", action="store", dest="question_file", type=str, default=None,
-                        help="File containing the '.hed' question set to query the labels with.")
-    parser.add_argument("--subphone_feat_type", action="store", dest="subphone_feat_type", type=str, default=None,
-                        help="The type of subphone counter features to add to the frame-level numerical vectors.")
+    parser.add_argument("--no-state_level", dest="state_level", action="store_false", help=argparse.SUPPRESS)
 
 
 class QuestionSet(object):
@@ -64,6 +61,10 @@ class QuestionSet(object):
         self.lines = list(map(lambda l: re.sub('\s+', ' ', l), self.lines))
 
         self.binary_regexes, self.numerical_regexes = self.compile_questions(self.lines)
+
+    @property
+    def dim(self):
+        return len(self.binary_regexes) + len(self.numerical_regexes)
 
     def query(self, label):
         """Queries the full-context label using the binary and numerical questions.
@@ -233,6 +234,32 @@ class SubphoneFeatureSet(object):
 
         self.subphone_feature_type = SubphoneFeatureTypeEnum[subphone_feature_type.upper()]
 
+    @property
+    def dim(self):
+        if self.subphone_feature_type == SubphoneFeatureTypeEnum.FULL:
+            # Zhizheng's original 5 state features + 4 phoneme features.
+            return 9
+        elif self.subphone_feature_type == SubphoneFeatureTypeEnum.MINIMAL_PHONEME:
+            # Equivalent to a frame-based system with minimal features.
+            return 3
+        elif self.subphone_feature_type == SubphoneFeatureTypeEnum.MINIMAL_FRAME:
+            # Minimal features necessary to go from a state-level to frame-level model.
+            return 2
+        elif self.subphone_feature_type == SubphoneFeatureTypeEnum.FRAME_ONLY:
+            # Equivalent to a frame-based system without relying on state-features.
+            return 1
+        elif self.subphone_feature_type == SubphoneFeatureTypeEnum.STATE_ONLY:
+            # Equivalent to a state-based system.
+            return 1
+        elif self.subphone_feature_type == SubphoneFeatureTypeEnum.UNIFORM_STATE:
+            # Equivalent to a frame-based system with uniform state-features.
+            return 2
+        elif self.subphone_feature_type == SubphoneFeatureTypeEnum.COARSE_CODING:
+            # Equivalent to a frame-based positioning system reported in Heiga Zen's work.
+            return 2
+        else:
+            return 0
+
     @staticmethod
     def relative_pos(index, length):
         """Calculates the relative position of the index through a sequence.
@@ -251,64 +278,66 @@ class SubphoneFeatureSet(object):
         bw = (length - index) / length
         return fw, bw
 
-    def full(self, frame_index, frame_index_in_phone, state_index, frames_in_state, frames_in_phone, states_per_phone):
+    def full(self, frame_in_state_index, frame_in_phone_index, state_in_phone_index,
+             frames_in_state, frames_in_phone, states_per_phone):
         """Zhizheng's original 5 state features + 4 phoneme features.
 
         NOTE: Only valid for state-level label alignments."""
         fraction_of_state_in_phone = frames_in_state / frames_in_phone
 
-        state_index_fw = state_index + 1.
-        state_index_bw = states_per_phone - state_index
+        state_in_phone_index_fw = state_in_phone_index + 1.
+        state_in_phone_index_bw = states_per_phone - state_in_phone_index
 
-        fraction_through_state_fw, fraction_through_state_bw = self.relative_pos(frame_index, frames_in_state)
-        fraction_through_phone_fw, fraction_through_phone_bw = self.relative_pos(frame_index_in_phone, frames_in_phone)
+        fraction_through_state_fw, fraction_through_state_bw = self.relative_pos(frame_in_state_index, frames_in_state)
+        fraction_through_phone_fw, fraction_through_phone_bw = self.relative_pos(frame_in_phone_index, frames_in_phone)
 
         # The order of the features is determined based on Merlin's subphone features.
-        return [fraction_through_state_fw, fraction_through_state_bw, frames_in_state, state_index_fw, state_index_bw,
-                frames_in_phone, fraction_of_state_in_phone, fraction_through_phone_bw, fraction_through_phone_fw]
+        return [fraction_through_state_fw, fraction_through_state_bw, frames_in_state,
+                state_in_phone_index_fw, state_in_phone_index_bw, frames_in_phone,
+                fraction_of_state_in_phone, fraction_through_phone_bw, fraction_through_phone_fw]
 
-    def minimal_phoneme(self, frame_index_in_phone, frames_in_phone):
+    def minimal_phoneme(self, frame_in_phone_index, frames_in_phone):
         """Equivalent to a frame-based system with minimal features."""
-        fraction_through_phone_fw, fraction_through_phone_bw = self.relative_pos(frame_index_in_phone, frames_in_phone)
+        fraction_through_phone_fw, fraction_through_phone_bw = self.relative_pos(frame_in_phone_index, frames_in_phone)
 
         # The order of the features is determined based on Merlin's subphone features.
-        return [fraction_through_phone_fw, fraction_through_phone_bw, frame_index_in_phone]
+        return [fraction_through_phone_fw, fraction_through_phone_bw, frame_in_phone_index]
 
-    def minimal_frame(self, frame_index, state_index, frames_in_state):
+    def minimal_frame(self, frame_in_state_index, state_in_phone_index, frames_in_state):
         """Minimal features necessary to go from a state-level to frame-level model."""
-        fraction_through_state_fw, _ = self.relative_pos(frame_index, frames_in_state)
+        fraction_through_state_fw, _ = self.relative_pos(frame_in_state_index, frames_in_state)
 
-        state_index_fw = state_index + 1.
+        state_in_phone_index_fw = state_in_phone_index + 1.
 
         # The order of the features is determined based on Merlin's subphone features.
-        return [fraction_through_state_fw, state_index_fw]
+        return [fraction_through_state_fw, state_in_phone_index_fw]
 
-    def frame_only(self, frame_index_in_phone, frames_in_phone):
+    def frame_only(self, frame_in_phone_index, frames_in_phone):
         """Equivalent to a frame-based system without relying on state-features."""
-        fraction_through_phone_fw, _ = self.relative_pos(frame_index_in_phone, frames_in_phone)
+        fraction_through_phone_fw, _ = self.relative_pos(frame_in_phone_index, frames_in_phone)
 
         return [fraction_through_phone_fw]
 
-    def state_only(self, state_index):
+    def state_only(self, state_in_phone_index):
         """Equivalent to a state-based system.
 
         NOTE: Only valid for state-level labels alignments."""
-        state_index_fw = state_index + 1.
-        return [state_index_fw]
+        state_in_phone_index_fw = state_in_phone_index + 1.
+        return [state_in_phone_index_fw]
 
-    def uniform_state(self, frame_index_in_phone, frames_in_phone, states_per_phone):
+    def uniform_state(self, frame_in_phone_index, frames_in_phone, states_per_phone):
         """Equivalent to a frame-based system with uniform state-features."""
-        fraction_through_phone_fw, _ = self.relative_pos(frame_index_in_phone, frames_in_phone)
+        fraction_through_phone_fw, _ = self.relative_pos(frame_in_phone_index, frames_in_phone)
 
         # Ignore state_index and assume state durations are uniform
-        uniform_state_index = np.ceil(frame_index_in_phone / frames_in_phone * states_per_phone)
+        uniform_state_index = np.ceil(frame_in_phone_index / frames_in_phone * states_per_phone)
 
         # The order of the features is determined based on Merlin's subphone features.
         return [fraction_through_phone_fw, uniform_state_index]
 
-    def coarse_coding(self, frame_index_in_phone, frames_in_phone):
+    def coarse_coding(self, frame_in_phone_index, frames_in_phone):
         """Equivalent to a frame-based positioning system reported in Heiga Zen's work."""
-        offset = frame_index_in_phone / frames_in_phone  # [0.0, 1.0]
+        offset = frame_in_phone_index / frames_in_phone  # [0.0, 1.0]
 
         x1_in_normal_pdf = -1.0 + offset  # [-1.0, 0.0]
         x2_in_normal_pdf = -0.5 + offset  # [ 0.5, 0.5]
@@ -317,57 +346,58 @@ class SubphoneFeatureSet(object):
         mu, sigma = 0.0, 0.4
         densities_from_normal_pdf = norm(mu, sigma).pdf([x1_in_normal_pdf, x2_in_normal_pdf, x3_in_normal_pdf])
 
-        return [*densities_from_normal_pdf, frames_in_phone]
+        return densities_from_normal_pdf + [frames_in_phone]
 
-    def query(self, frame_index, frame_index_in_phone, state_index, frames_in_state, frames_in_phone, states_per_phone):
+    def query(self, frame_in_state_index, frame_in_phone_index, state_in_phone_index,
+              frames_in_state, frames_in_phone, states_per_phone):
         """Creates the subphone counter features based on the stateful position information of the subphone.
 
         Args:
-            frame_index (int): The index of this frame through the current state.
-            frame_index_in_phone (int): The index of this frame through the current phone.
-            state_index (int): The index of this state through the current phone, range = [1, `states_per_phone`].
-            frames_in_state (int): The number of frames in the current state.
-            frames_in_phone (int): The number of frames in the current phone.
-            states_per_phone (int): The number of states in each phone, only valid for state-level label alignments.
+            frame_in_state_index (int): Index of this frame through the current state.
+            frame_in_phone_index (int): Index of this frame through the current phone.
+            state_in_phone_index (int): Index of this state through the current phone, range = [0, states_per_phone-1].
+            frames_in_state (int): Number of frames in the current state.
+            frames_in_phone (int): Number of frames in the current phone.
+            states_per_phone (int): Number of states in each phone, only valid for state-level label alignments.
 
         Returns:
             (np.ndarray): Subphone counter features for one frame.
         """
-        frame_index = float(frame_index)
-        frame_index_in_phone = float(frame_index_in_phone)
-        state_index = float(state_index)
+        frame_in_state_index = float(frame_in_state_index)
+        frame_in_phone_index = float(frame_in_phone_index)
+        state_in_phone_index = float(state_in_phone_index)
         frames_in_state = float(frames_in_state)
         frames_in_phone = float(frames_in_phone)
         states_per_phone = float(states_per_phone)
 
         if self.subphone_feature_type == SubphoneFeatureTypeEnum.FULL:
             # Zhizheng's original 5 state features + 4 phoneme features.
-            return self.full(
-                frame_index, frame_index_in_phone, state_index, frames_in_state, frames_in_phone, states_per_phone)
+            return self.full(frame_in_state_index, frame_in_phone_index, state_in_phone_index,
+                             frames_in_state, frames_in_phone, states_per_phone)
 
         elif self.subphone_feature_type == SubphoneFeatureTypeEnum.MINIMAL_PHONEME:
             # Equivalent to a frame-based system with minimal features.
-            return self.minimal_phoneme(frame_index_in_phone, frames_in_phone)
+            return self.minimal_phoneme(frame_in_phone_index, frames_in_phone)
 
         elif self.subphone_feature_type == SubphoneFeatureTypeEnum.MINIMAL_FRAME:
             # Minimal features necessary to go from a state-level to frame-level model.
-            return self.minimal_frame(frame_index, state_index, frames_in_state)
+            return self.minimal_frame(frame_in_state_index, state_in_phone_index, frames_in_state)
 
         elif self.subphone_feature_type == SubphoneFeatureTypeEnum.FRAME_ONLY:
             # Equivalent to a frame-based system without relying on state-features.
-            return self.frame_only(frame_index_in_phone, frames_in_phone)
+            return self.frame_only(frame_in_phone_index, frames_in_phone)
 
         elif self.subphone_feature_type == SubphoneFeatureTypeEnum.STATE_ONLY:
             # Equivalent to a state-based system.
-            return self.state_only(state_index)
+            return self.state_only(state_in_phone_index)
 
         elif self.subphone_feature_type == SubphoneFeatureTypeEnum.UNIFORM_STATE:
             # Equivalent to a frame-based system with uniform state-features.
-            return self.uniform_state(frame_index_in_phone, frames_in_phone, states_per_phone)
+            return self.uniform_state(frame_in_phone_index, frames_in_phone, states_per_phone)
 
         elif self.subphone_feature_type == SubphoneFeatureTypeEnum.COARSE_CODING:
             # Equivalent to a frame-based positioning system reported in Heiga Zen's work.
-            return self.coarse_coding(frame_index_in_phone, frames_in_phone)
+            return self.coarse_coding(frame_in_phone_index, frames_in_phone)
 
         else:
             return []
@@ -396,6 +426,7 @@ class Label(object):
             states_per_phone (int): Number of states in a phone. If `self.state_level` is false, then this will be 1.
         """
         self.file_path = file_path
+        self.base_name = os.path.splitext(os.path.basename(self.file_path))[0]
         self.state_level = state_level
         self.states_per_phone = states_per_phone if state_level else 1
 
@@ -450,7 +481,7 @@ class Label(object):
         phones = []
         for label in self.labels:
             current_phone_match = current_phone_regex.search(label)
-            current_phone = current_phone_match.group(0)
+            current_phone = current_phone_match.group(1)
 
             phones.append(current_phone)
 
@@ -485,66 +516,87 @@ class Label(object):
 
         return state_level_durations, phone_level_durations
 
-    def normalise(self, question_set, subphone_feature_set=None, upsample_to_frame_level=True):
-        """Queries the labels using the question set, calculates any additional features, and returns vectorised labels.
+    def extract_counter_features(self, subphone_feature_set):
+        """Creates the frame-level counter features.
+
+        Args:
+            subphone_feature_set (SubphoneFeatureSet instance): Container that defines the subphone features to be
+                extracted from the durations. If None, then no additional frame-level features are created.
+
+        Returns:
+            (np.ndarray): Numerical counter features at the frame level."""
+        n_frames = np.sum(self.phone_durations).item()
+        counter_dim = subphone_feature_set.dim
+        counter_features= np.zeros((n_frames, counter_dim), dtype=np.float32)
+
+        frame_index = 0
+        for label, state_in_phone_duration in zip(self.labels, self.state_in_phone_durations):
+            frames_in_phone = sum(state_in_phone_duration)
+
+            # Track the frame counter per phone, so we don't reset it after each iteration of the inner loop.
+            frame_in_phone_index = 0
+            for state_in_phone_index, frames_in_state in enumerate(state_in_phone_duration):
+
+                # We can't track `frame_in_phone_index` here as it would reset for each state.
+                for frame_in_state_index in range(frames_in_state):
+
+                    # Get the subphone counter features for this frame.
+                    counter_feature = subphone_feature_set.query(
+                        frame_in_state_index, frame_in_phone_index, state_in_phone_index,
+                        frames_in_state, frames_in_phone, self.states_per_phone)
+
+                    # Add the frame-level counters to our accumulator array.
+                    counter_features[frame_index] = counter_feature
+                    frame_in_phone_index += 1
+                    frame_index += 1
+
+        print("Numerical labels created for {}: {} frames; {} subphone counter features."
+              .format(self.base_name, n_frames, counter_dim))
+
+        return counter_features
+
+    def extract_numerical_labels(self, question_set, upsample_to_frame_level=True):
+        """Queries the labels using the question set, and returns the numerical labels.
 
         Args:
             question_set (QuestionSet instance): Question set used to query the labels.
-            subphone_feature_set (SubphoneFeatureSet instance): Container that defines the subphone features to be
-                extracted from the durations. If None, then no additional frame-level features are created.
             upsample_to_frame_level (bool): If True, upsamples phone-level features to frame-level.
 
         Returns:
             (np.ndarray): Numerical labels suitable for machine learning."""
-        # Accumulator array used to add frame-level vectors to.
-        frame_level_vectors = []
-        phone_level_vectors = []
-
-        for label, phone_duration in zip(self.labels, self.state_in_phone_durations):
-            # Get the numerical label once for each phone using the question set.
-            label_vector = question_set.query(label)
-            phone_level_vectors.append(label_vector)
-
-            if subphone_feature_set is not None:
-                frames_in_phone = sum(phone_duration)
-
-                # Track the frame counter per phone, so we don't reset it after each iteration of the inner loop.
-                frame_index_in_phone = 0
-                for state_index, frames_in_state in enumerate(phone_duration):
-                    # We can't track `frame_index` here as it would reset for each state.
-                    for frame_index in range(frames_in_state):
-                        # Get the subphone counter features for this frame.
-                        subphone_features = subphone_feature_set.query(
-                            frame_index, frame_index_in_phone, state_index, frames_in_state, frames_in_phone,
-                            self.states_per_phone)
-
-                        if upsample_to_frame_level:
-                            # Add the phone-level label to the frame-level accumulator array.
-                            subphone_features = np.concatenate((label_vector, subphone_features))
-
-                        # Add the frame-level counters to our accumulator array.
-                        frame_level_vectors.append(subphone_features)
-                        frame_index_in_phone += 1
-
-        phone_level_vectors = np.array(phone_level_vectors, dtype=np.float32)
-        frame_level_vectors = np.array(frame_level_vectors, dtype=np.float32)
-
-        n_phones = len(phone_level_vectors)
-        n_frames = len(frame_level_vectors)
-        lab_dim = np.array(label_vector).shape[0]
-
-        if subphone_feature_set is not None:
-            count_dim = np.array(subphone_features).shape[0] - lab_dim
+        if upsample_to_frame_level:
+            seq_len = np.sum(self.phone_durations).item()
         else:
-            count_dim = 'no'
+            seq_len = len(self.phones)
+        lab_dim = question_set.dim
 
-        print("Numerical labels created: {} phones; {} frames; {} question features; {} subphone counter features."
-              .format(n_phones, n_frames, lab_dim, count_dim))
+        numerical_labels = np.zeros((seq_len, lab_dim), dtype=np.float32)
 
-        if subphone_feature_set is None:
-            return phone_level_vectors
+        if upsample_to_frame_level:
+            frame_index = 0
+            for label, state_in_phone_duration in zip(self.labels, self.state_in_phone_durations):
+                # Get the numerical label once for each phone using the question set.
+                label_vector = question_set.query(label)
+
+                for frames_in_state in state_in_phone_duration:
+                    for _ in range(frames_in_state):
+                        # Add the phone-level label to the frame-level accumulator array.
+                        numerical_labels[frame_index] = label_vector
+                        frame_index += 1
+
+            print("Numerical labels created for {}, upsampled to frame-level: {} phones; {} frames; {} label features."
+                  .format(self.base_name, len(self.phones), seq_len, lab_dim))
+
         else:
-            return phone_level_vectors, frame_level_vectors
+            for phone_index, label in enumerate(self.labels):
+                # Get the numerical label once for each phone using the question set.
+                label_vector = question_set.query(label)
+                numerical_labels[phone_index] = label_vector
+
+            print("Numerical labels created for {}, at phone-level: {} phones; {} label features."
+                  .format(self.base_name, seq_len, lab_dim))
+
+        return numerical_labels
 
 
 def main():
@@ -552,21 +604,26 @@ def main():
     parser.add_argument("--lab_file", action="store", dest="lab_file", type=str, required=True,
                         help="File path of the label to be converted.")
     parser.add_argument("--out_file", action="store", dest="out_file", type=str, required=True,
-                        help="File path to save the numerical labels to.")
+                        help="File path to save the numerical labels to, without file extension.")
+    parser.add_argument("--question_file", action="store", dest="question_file", type=str, default=None,
+                        help="File containing the '.hed' question set to query the labels with.")
+    parser.add_argument("--subphone_feat_type", action="store", dest="subphone_feat_type", type=str, default=None,
+                        help="The type of subphone counter features to add to the frame-level numerical vectors.")
     add_arguments(parser)
     args = parser.parse_args()
 
     label = Label(args.lab_file, args.state_level)
     questions = QuestionSet(args.question_file)
-    suphone_features = SubphoneFeatureSet(args.subphone_feat_type)
+    subphone_feature_set = SubphoneFeatureSet(args.subphone_feat_type)
+    out_file = os.path.splitext(args.out_file)[0]
 
-    if args.subphone_feat_type is None:
-        numerical_labels = label.normalise(questions, upsample_to_frame_level=False)
-        save_bin(numerical_labels, args.out_file)
-    else:
-        numerical_labels, counter_features = label.normalise(questions, suphone_features)
-        save_bin(counter_features, args.out_file)
+    if args.question_file is not None:
+        numerical_labels = label.extract_numerical_labels(questions, upsample_to_frame_level=False)
+        save_bin(numerical_labels, '{}.lab'.format(out_file))
 
+    if args.subphone_feat_type is not None:
+        counter_features = label.extract_counter_features(subphone_feature_set)
+        save_bin(counter_features, '{}.counters'.format(out_file))
 
 
 if __name__ == "__main__":
