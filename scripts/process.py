@@ -12,10 +12,10 @@ import argparse
 import numpy as np
 import os
 
-from . import file_io
-from . import lab_features
-from . import utils
-from . import wav_features
+from tts_data_tools import file_io
+from tts_data_tools import lab_features
+from tts_data_tools import utils
+from tts_data_tools import wav_features
 
 
 def add_arguments(parser):
