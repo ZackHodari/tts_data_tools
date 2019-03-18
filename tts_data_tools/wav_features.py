@@ -5,6 +5,7 @@ Usage:
 """
 
 import argparse
+import os
 
 import numpy as np
 from scipy.signal import convolve2d
@@ -13,6 +14,9 @@ import pyworld
 import pyreaper
 
 from .file_io import save_bin, load_wav
+
+REAPER_UNVOICED_VALUE = -1.
+WORLD_UNVOICED_VALUE = 0.
 
 
 def add_arguments(parser):
@@ -53,6 +57,7 @@ class Wav(object):
         Args:
             file_path (str): Wave file to be loaded.
         """
+        self.base_name = os.path.splitext(os.path.basename(file_path))[0]
         self.data, self.sample_rate = load_wav(file_path)
 
     def reaper(self):
@@ -61,10 +66,10 @@ class Wav(object):
         Note VUV in F0 is represented using -1.0
 
         Returns:
-            (np.ndarray[n_frames]): fundamental frequency.
+            (np.ndarray[n_frames, 1]): fundamental frequency.
         """
         pm_times, pm, f0_times, f0, corr = pyreaper.reaper(self.data, self.sample_rate)
-        return f0
+        return f0.reshape((-1, 1))
 
     def world(self):
         """Extracts vocoder features using WORLD.
@@ -72,7 +77,7 @@ class Wav(object):
         Note VUV in F0 is represented using 0.0
 
         Returns:
-            (np.ndarray[n_frames]): fundamental frequency,
+            (np.ndarray[n_frames, 1]): fundamental frequency,
             (np.ndarray[n_frames, sp_dim]): smoothed spectrogram,
             (np.ndarray[n_frames, ap_dim]): aperiodicity.
         """
@@ -80,9 +85,17 @@ class Wav(object):
         int_ceiling = 2 ** (nbits - 1)
         float_data = self.data.astype(np.float64) / int_ceiling
         f0, smoothed_spectrogram, aperiodicity = pyworld.wav2world(float_data, self.sample_rate)
-        return f0, smoothed_spectrogram, aperiodicity
+        return f0.reshape((-1, 1)), smoothed_spectrogram, aperiodicity
 
-    def interpolate(self, signal, is_voiced):
+    @staticmethod
+    def extract_vuv(signal, unvoiced_value=REAPER_UNVOICED_VALUE):
+
+        is_unvoiced = np.isclose(signal, unvoiced_value * np.ones_like(signal), atol=1e-6)
+        is_voiced = np.logical_not(is_unvoiced)
+        return is_voiced
+
+    @staticmethod
+    def interpolate(signal, is_voiced):
         """Linearly interpolates the signal in unvoiced regions such that there are no discontinuities.
 
         Args:
@@ -146,19 +159,18 @@ class Wav(object):
 
         # REAPER marks frames using their left edge, while WORLD uses their centre. This leads to 2 frames that REAPER
         # does not capture. Additionally, framing scheme differences also lead to fewer frames at the end in REAPER.
-        assert f0.shape[0] <= f0_world.shape[0] - 2, (
+        diff = f0_world.shape[0] - f0.shape[0]
+        assert diff >= 2, (
             "We expect REAPER's f0 estimate to be at least 2 frames shorter that WORLD's f0,"
             "got len(f0_REAPER) = {}, len(f0_WORLD) = {}".format(f0.shape[0], f0_world.shape[0]))
 
-        diff = f0_world.shape[0] - f0.shape[0]
-        pad_start = np.tile(f0[0], 2)
-        pad_end = np.tile(f0[-1], diff - 2)
+        pad_start = np.repeat(f0[0, np.newaxis], 2, axis=0)
+        pad_end = np.repeat(f0[-1, np.newaxis], diff - 2, axis=0)
 
-        f0 = np.concatenate((pad_start, f0, pad_end)).reshape((-1, 1))
+        f0 = np.concatenate((pad_start, f0, pad_end), axis=0)
 
-        is_unvoiced = np.isclose(f0, -1. * np.ones_like(f0), atol=1e-6)
-        is_voiced = np.logical_not(is_unvoiced)
-        f0_interpolated = self.interpolate(f0, is_voiced)
+        vuv = self.extract_vuv(f0, REAPER_UNVOICED_VALUE)
+        f0_interpolated = self.interpolate(f0, vuv)
 
         num_frames = f0_interpolated.shape[0]
         f0_dim = f0_interpolated.shape[1]
@@ -166,9 +178,10 @@ class Wav(object):
         ap_dim = ap.shape[1]
         total_dim = f0_dim + sp_dim + ap_dim
 
-        print("Vocoder features created: {} frames; f0 dimensionality = {}; sp dimensionality = {}; "
-              "ap dimensionality = {}; and {} total features.".format(num_frames, f0_dim, sp_dim, ap_dim, total_dim))
-        return f0_interpolated, is_voiced, sp, ap
+        print("Vocoder features created for {}: {} frames; "
+              "f0 dimensionality = {}; sp dimensionality = {}; ap dimensionality = {}; with {} total features."
+              .format(self.base_name, num_frames, f0_dim, sp_dim, ap_dim, total_dim))
+        return f0_interpolated, vuv, sp, ap
 
 
 def main():
