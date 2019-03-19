@@ -66,6 +66,7 @@ def extract_from_dataset(file_ids, lab_dir, wav_dir, state_level, question_file,
         f0, vuv, sp, ap = wav.extract_features()
         lf0 = np.log(f0)
 
+        # Often the durations from forced alignment are a few frames longer than the vocoder features.
         diff = n_frame - f0.shape[0]
         if diff > len(duration):
             raise ValueError("Number of label frames and vocoder frames is too different for {name}\n"
@@ -79,6 +80,7 @@ def extract_from_dataset(file_ids, lab_dir, wav_dir, state_level, question_file,
             # Remove 1 frame from each phone's duration starting at the end of the sequence.
             duration[-diff:] -= 1
             n_frame = f0.shape[0]
+            print("Cropped {} frames from durations and  for utterance {}".format(diff, file_id))
 
         assert n_frame == np.sum(duration).item()
 
