@@ -6,14 +6,22 @@ Data processing tools for preparing speech and labels for training TTS voices
 
 ## Usage
 
-### Batch processing of files
+### Batch processing of datasets
 ```bash
-python process.py \
-    [--lab_dir DIR] [--state_level] \
-    [--wav_dir DIR] \
+tdt_process_dataset \
+    --lab_dir DIR \
+    --wav_dir DIR \
+    --out_dir DIR \
+    --question_file FILE \
     [--id_list FILE] \
-    --out_dir DIR
+    [--state_level | --no-state_level] \
+    [--upsample_to_frame_level] \
+    [--subphone_feat_type STR] \
+    [--calculate_normalisation] \
+    [--normalisation_of_deltas]
 ```
+
+Other batch processing scripts are given in [scripts](scripts). These can be used from the command line with the prefix `tdt_`, or as templates to create your own processing.
 
 
 ### Modifying file encodings
