@@ -70,6 +70,8 @@ def calculate_mvn_parameters(feature_list, data_dir=None, feat_name=None, deltas
     # Calculate the global parameters.
     mean = sums / counts
     variance = (sum_squares - (sums ** 2) / counts) / counts
+    # Any variance values less than zero are due to numerical precision, ensure they are set to zero.
+    variance[variance < 0.] = 0.
     std_dev = np.sqrt(variance)
 
     mvn_params = {
@@ -81,6 +83,8 @@ def calculate_mvn_parameters(feature_list, data_dir=None, feat_name=None, deltas
         # Calculate the global parameters for delta and delta-delta features.
         delta_mean = delta_sums / counts
         delta_variance = (delta_sum_squares - (delta_sums ** 2) / counts) / counts
+        # Any variance values less than zero are due to numerical precision, ensure they are set to zero.
+        delta_variance[delta_variance < 0.] = 0.
         delta_std_dev = np.sqrt(delta_variance)
 
         delta_mvn_params = {
