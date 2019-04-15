@@ -15,9 +15,9 @@ from tts_data_tools import file_io
 from tts_data_tools import lab_features
 from tts_data_tools import utils
 
-from .mean_variance_normalisation import calculate_mvn_parameters
-from .min_max_normalisation import calculate_minmax_parameters
-from .save_features import save_counter_features, save_durations, save_numerical_labels
+from tts_data_tools.scripts.mean_variance_normalisation import calculate_mvn_parameters
+from tts_data_tools.scripts.min_max_normalisation import calculate_minmax_parameters
+from tts_data_tools.scripts.save_features import save_counter_features, save_durations, save_numerical_labels
 
 
 def add_arguments(parser):

@@ -15,8 +15,8 @@ import os
 from tts_data_tools import utils
 from tts_data_tools import wav_features
 
-from .mean_variance_normalisation import calculate_mvn_parameters
-from .save_features import save_lf0, save_vuv, save_sp, save_ap
+from tts_data_tools.scripts.mean_variance_normalisation import calculate_mvn_parameters
+from tts_data_tools.scripts.save_features import save_lf0, save_vuv, save_sp, save_ap
 
 
 def add_arguments(parser):

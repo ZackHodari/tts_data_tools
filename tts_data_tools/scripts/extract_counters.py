@@ -14,8 +14,8 @@ import os
 from tts_data_tools import lab_features
 from tts_data_tools import utils
 
-from .min_max_normalisation import calculate_minmax_parameters
-from .save_features import save_counter_features
+from tts_data_tools.scripts.min_max_normalisation import calculate_minmax_parameters
+from tts_data_tools.scripts.save_features import save_counter_features
 
 
 def add_arguments(parser):

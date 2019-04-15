@@ -14,7 +14,7 @@ import os
 from tts_data_tools import lab_features
 from tts_data_tools import utils
 
-from .save_features import save_phones
+from tts_data_tools.scripts.save_features import save_phones
 
 
 def add_arguments(parser):
