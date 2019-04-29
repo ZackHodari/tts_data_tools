@@ -18,8 +18,8 @@ from tts_data_tools import wav_features
 
 from tts_data_tools.scripts.mean_variance_normalisation import calculate_mvn_parameters
 from tts_data_tools.scripts.min_max_normalisation import calculate_minmax_parameters
-from tts_data_tools.scripts.save_features import save_numerical_labels, save_counter_features, save_durations, \
-    save_n_frames, save_n_phones, save_lf0, save_vuv, save_sp, save_ap
+from tts_data_tools.scripts.save_features import save_numerical_labels, save_counter_features, save_phones, \
+    save_durations, save_n_frames, save_n_phones, save_lf0, save_vuv, save_sp, save_ap
 
 
 def add_arguments(parser):
@@ -60,6 +60,7 @@ def extract_from_dataset(file_ids, lab_dir, wav_dir, state_level, question_file,
 
         numerical_label = label.extract_numerical_labels(_question_set, upsample_to_frame_level=_upsample)
         counter_feature = label.extract_counter_features(_subphone_feature_set)
+        phones = label.phones
         duration = label.phone_durations.reshape((-1, 1))
         n_frame = np.sum(duration).item()
         n_phone = len(label.phones)
@@ -91,7 +92,7 @@ def extract_from_dataset(file_ids, lab_dir, wav_dir, state_level, question_file,
         sp = sp[:n_frame]
         ap = ap[:n_frame]
 
-        return numerical_label, counter_feature, duration, n_frame, n_phone, lf0, vuv, sp, ap
+        return numerical_label, counter_feature, phones, duration, n_frame, n_phone, lf0, vuv, sp, ap
 
     return zip(*extract(file_ids))
 
@@ -124,11 +125,12 @@ def process(lab_dir, wav_dir, id_list, out_dir,
     if len(file_ids) != len(_file_ids) or sorted(file_ids) != sorted(_file_ids):
         raise ValueError("Please provide id_list, or ensure that wav_dir and lab_dir contain the same files.")
 
-    numerical_labels, counter_features, durations, n_frames, n_phones, lf0_list, vuv_list, sp_list, ap_list = \
+    numerical_labels, counter_features, phones, durations, n_frames, n_phones, lf0_list, vuv_list, sp_list, ap_list = \
         extract_from_dataset(file_ids, lab_dir, wav_dir, state_level, question_file, upsample, subphone_feat_type)
 
     save_numerical_labels(file_ids, numerical_labels, out_dir)
     save_counter_features(file_ids, counter_features, out_dir)
+    save_phones(file_ids, phones, out_dir)
     save_durations(file_ids, durations, out_dir)
     save_n_frames(file_ids, n_frames, out_dir)
     save_n_phones(file_ids, n_phones, out_dir)
