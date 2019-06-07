@@ -142,6 +142,11 @@ def save_wav(file_path, data, sample_rate):
     Args:
         data (np.ndarray): Waveform samples.
         file_path (str): File to save to."""
+    if np.issubdtype(data.dtype, np.floating):
+        data = data.astype(np.float32)
+    elif data.dtype not in [np.int32, np.int16, np.uint8]:
+        raise ValueError("wavfile data must be np.float*, np.int32, np.int16, or np.uint8, got {}".format(data.dtype))
+
     wavfile.write(file_path, sample_rate, data)
 
 
