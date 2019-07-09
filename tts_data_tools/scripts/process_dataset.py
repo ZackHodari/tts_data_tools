@@ -12,9 +12,10 @@ import argparse
 import numpy as np
 import os
 
+from tts_data_tools import file_io
 from tts_data_tools import lab_features
 from tts_data_tools import utils
-from tts_data_tools import wav_features
+from tts_data_tools.wav_gen import world_with_reaper_f0
 
 from tts_data_tools.scripts.mean_variance_normalisation import calculate_mvn_parameters
 from tts_data_tools.scripts.min_max_normalisation import calculate_minmax_parameters
@@ -55,9 +56,6 @@ def extract_from_dataset(file_ids, lab_dir, wav_dir, state_level, question_file,
         lab_path = os.path.join(_lab_dir, '{}.lab'.format(file_id))
         label = lab_features.Label(lab_path, _state_level)
 
-        wav_path = os.path.join(_wav_dir, '{}.wav'.format(file_id))
-        wav = wav_features.Wav(wav_path)
-
         numerical_label = label.extract_numerical_labels(_question_set, upsample_to_frame_level=_upsample)
         counter_feature = label.extract_counter_features(_subphone_feature_set)
         phones = label.phones
@@ -65,7 +63,10 @@ def extract_from_dataset(file_ids, lab_dir, wav_dir, state_level, question_file,
         n_frame = np.sum(duration).item()
         n_phone = len(label.phones)
 
-        f0, vuv, sp, ap = wav.extract_features()
+        wav_path = os.path.join(_wav_dir, '{}.wav'.format(file_id))
+        wav, sample_rate = file_io.load_wav(wav_path)
+
+        f0, vuv, sp, ap = world_with_reaper_f0.analysis(wav, sample_rate)
         lf0 = np.log(f0)
 
         # Often the durations from forced alignment are a few frames longer than the vocoder features.

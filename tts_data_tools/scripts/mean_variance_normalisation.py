@@ -15,7 +15,7 @@ import os
 
 from tts_data_tools import file_io
 from tts_data_tools import utils
-from tts_data_tools import wav_features
+from tts_data_tools.wav_gen.utils import compute_deltas
 
 
 def add_arguments(parser):
@@ -63,7 +63,7 @@ def calculate_mvn_parameters(feature_list, data_dir=None, feat_name=None, deltas
         counts += feature.shape[0]
 
         if deltas:
-            delta_feature = wav_features.compute_deltas(feature)
+            delta_feature = compute_deltas(feature)
             delta_sums += np.sum(delta_feature, axis=0)
             delta_sum_squares += np.sum(delta_feature ** 2, axis=0)
 

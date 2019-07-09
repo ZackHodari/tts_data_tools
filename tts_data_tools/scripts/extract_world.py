@@ -12,8 +12,9 @@ import argparse
 import numpy as np
 import os
 
+from tts_data_tools import file_io
 from tts_data_tools import utils
-from tts_data_tools import wav_features
+from tts_data_tools.wav_gen import world
 
 from tts_data_tools.scripts.mean_variance_normalisation import calculate_mvn_parameters
 from tts_data_tools.scripts.save_features import save_lf0, save_vuv, save_sp, save_ap
@@ -37,11 +38,9 @@ def extract_world(file_ids, wav_dir):
     @utils.multithread(_wav_dir=wav_dir)
     def extract(file_id, _wav_dir):
         wav_path = os.path.join(_wav_dir, '{}.wav'.format(file_id))
-        wav = wav_features.Wav(wav_path)
+        wav, sample_rate = file_io.load_wav(wav_path)
 
-        f0, sp, ap = wav.world()
-        vuv = wav.extract_vuv(f0, wav_features.WORLD_UNVOICED_VALUE)
-        f0 = wav.interpolate(f0, vuv)
+        f0, vuv, sp, ap = world.analysis(wav, sample_rate)
         lf0 = np.log(f0)
 
         return lf0, vuv, sp, ap

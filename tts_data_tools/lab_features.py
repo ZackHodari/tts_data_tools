@@ -16,7 +16,7 @@ import re
 import numpy as np
 from scipy.stats import norm
 
-from .file_io import save_bin, load_lines
+from tts_data_tools.file_io import save_bin, load_lines
 
 STATES_PER_PHONE = 5
 FRAME_SHIFT_MS = 5

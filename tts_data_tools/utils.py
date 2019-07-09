@@ -7,7 +7,7 @@ import os
 import sys
 from tqdm import tqdm
 
-from .file_io import load_lines
+from tts_data_tools.file_io import load_lines
 
 
 class DummyTqdmFile(object):
