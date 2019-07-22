@@ -95,7 +95,7 @@ def process(wav_dir, id_list, out_dir, calculate_normalisation, normalisation_of
 
     if calculate_normalisation:
         process_mvn(out_dir, 'lf0', id_list=id_list, deltas=normalisation_of_deltas)
-        process_mvn(out_dir, 'so', id_list=id_list, deltas=normalisation_of_deltas)
+        process_mvn(out_dir, 'sp', id_list=id_list, deltas=normalisation_of_deltas)
         process_mvn(out_dir, 'ap', id_list=id_list, deltas=normalisation_of_deltas)
 
 
