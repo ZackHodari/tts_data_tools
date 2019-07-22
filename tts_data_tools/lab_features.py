@@ -16,7 +16,11 @@ import re
 import numpy as np
 from scipy.stats import norm
 
-from tts_data_tools.file_io import save_bin, load_lines
+from tts_data_tools import file_io
+from tts_data_tools.utils import get_file_ids
+
+from tts_data_tools.scripts.mean_variance_normalisation import process as process_mvn
+from tts_data_tools.scripts.min_max_normalisation import process as process_minmax
 
 STATES_PER_PHONE = 5
 FRAME_SHIFT_MS = 5
@@ -56,7 +60,7 @@ class QuestionSet(object):
             file_path = pkg_resources.resource_filename('tts_data_tools', os.path.join('question_sets', file_path))
 
         self.file_path = file_path
-        self.lines = load_lines(self.file_path)
+        self.lines = file_io.load_lines(self.file_path)
         # Ensure the only whitespaces are single space characters.
         self.lines = list(map(lambda l: re.sub('\s+', ' ', l), self.lines))
 
@@ -430,7 +434,7 @@ class Label(object):
         self.state_level = state_level
         self.states_per_phone = states_per_phone if state_level else 1
 
-        self.lines = load_lines(self.file_path)
+        self.lines = file_io.load_lines(self.file_path)
         # Ensure the all whitespaces are single space characters.
         self.lines = list(map(lambda l: re.sub('\s+', ' ', l), self.lines))
 
@@ -599,31 +603,78 @@ class Label(object):
         return numerical_labels
 
 
+def process(lab_dir, id_list, out_dir, state_level,
+            question_file, upsample, subphone_feat_type, calculate_normalisation):
+    """Processes label files in id_list, saves the numerical labels and durations to file.
+
+    Args:
+        lab_dir (str): Directory containing the label files.
+        id_list (str): List of file basenames to process.
+        out_dir (str): Directory to save the output to.
+        state_level (bool): Indicates that the label files are state level if True, otherwise they are frame level.
+        question_file (str): Question set to be loaded. Can be one of the four provided question sets;
+                questions-unilex_dnn_600.hed
+                questions-unilex_phones_69.hed
+                questions-radio_dnn_416.hed
+                questions-radio_phones_48.hed
+                questions-mandarin.hed
+                questions-japanese.hed
+        upsample (bool): Whether to upsample phone-level numerical labels to frame-level.
+        subphone_feat_type (str): Subphone features to be extracted from the durations.
+        calculate_normalisation (bool): Calculate mean-variance and min-max normalisation for duration and labels.
+    """
+    file_ids = get_file_ids(lab_dir, id_list)
+    question_set = QuestionSet(question_file)
+    subphone_feature_set = SubphoneFeatureSet(subphone_feat_type)
+
+    for file_id in file_ids:
+        lab_path = os.path.join(lab_dir, '{}.lab'.format(file_id))
+        label = Label(lab_path, state_level)
+
+        numerical_labels = label.extract_numerical_labels(question_set, upsample_to_frame_level=upsample)
+        counter_features = label.extract_counter_features(subphone_feature_set)
+        durations = label.phone_durations.reshape((-1, 1))
+        phones = label.phones
+
+        n_frames = np.sum(durations).item()
+        n_phones = len(label.phones)
+
+        file_io.save_bin(numerical_labels, os.path.join(out_dir, 'lab', '{}.lab'.format(file_id)))
+        file_io.save_bin(counter_features, os.path.join(out_dir, 'counters', '{}.counters'.format(file_id)))
+        file_io.save_txt(durations, os.path.join(out_dir, 'dur', '{}.dur'.format(file_id)))
+        file_io.save_lines(phones, os.path.join(out_dir, 'phones', '{}.txt'.format(file_id)))
+
+        file_io.save_txt(n_frames, os.path.join(out_dir, 'n_frames', '{}.txt'.format(file_id)))
+        file_io.save_txt(n_phones, os.path.join(out_dir, 'n_phones', '{}.txt'.format(file_id)))
+
+    if calculate_normalisation:
+        process_minmax(out_dir, 'lab', id_list)
+        process_minmax(out_dir, 'counters', id_list)
+        process_mvn(out_dir, 'dur', is_npy=False, id_list=id_list, deltas=False)
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Script to load label files.")
-    parser.add_argument("--lab_file", action="store", dest="lab_file", type=str, required=True,
-                        help="File path of the label to be converted.")
-    parser.add_argument("--out_file", action="store", dest="out_file", type=str, required=True,
-                        help="File path to save the numerical labels to, without file extension.")
-    parser.add_argument("--question_file", action="store", dest="question_file", type=str, default=None,
+    parser = argparse.ArgumentParser(
+        description="Extracts numerical labels, counter features, and durations from forced alignment labels files.")
+    parser.add_argument("--lab_dir", action="store", dest="lab_dir", type=str, required=True,
+                        help="Directory of the label files to be converted.")
+    parser.add_argument("--id_list", action="store", dest="id_list", type=str, default=None,
+                        help="List of file ids to process (must be contained in lab_dir).")
+    parser.add_argument("--out_dir", action="store", dest="out_dir", type=str, required=True,
+                        help="Directory to save the output to.")
+    parser.add_argument("--question_file", action="store", dest="question_file", type=str, required=True,
                         help="File containing the '.hed' question set to query the labels with.")
+    parser.add_argument("--upsample_to_frame_level", action="store_true", dest="upsample_to_frame_level", default=False,
+                        help="Whether to upsample the numerical labels to frame-level.")
     parser.add_argument("--subphone_feat_type", action="store", dest="subphone_feat_type", type=str, default=None,
-                        help="The type of subphone counter features to add to the frame-level numerical vectors.")
+                        help="The type of subphone counter features.")
+    parser.add_argument("--calculate_normalisation", action="store_true", dest="calculate_normalisation", default=False,
+                        help="Whether to automatically calculate MVN parameters after extracting label features.")
     add_arguments(parser)
     args = parser.parse_args()
 
-    label = Label(args.lab_file, args.state_level)
-    questions = QuestionSet(args.question_file)
-    subphone_feature_set = SubphoneFeatureSet(args.subphone_feat_type)
-    out_file = os.path.splitext(args.out_file)[0]
-
-    if args.question_file is not None:
-        numerical_labels = label.extract_numerical_labels(questions, upsample_to_frame_level=False)
-        save_bin(numerical_labels, '{}.lab'.format(out_file))
-
-    if args.subphone_feat_type is not None:
-        counter_features = label.extract_counter_features(subphone_feature_set)
-        save_bin(counter_features, '{}.counters'.format(out_file))
+    process(args.lab_dir, args.id_list, args.out_dir, args.state_level,
+            args.question_file, args.upsample_to_frame_level, args.subphone_feat_type, args.calculate_normalisation)
 
 
 if __name__ == "__main__":

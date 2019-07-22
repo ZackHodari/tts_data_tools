@@ -1,5 +1,7 @@
 import argparse
 
+from tts_data_tools.wav_gen import utils
+
 
 def add_arguments(parser):
     parser.add_argument("--type", action="store", dest="type", type=str, required=True,

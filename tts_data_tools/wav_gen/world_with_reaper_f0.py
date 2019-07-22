@@ -1,12 +1,31 @@
 import argparse
-
 import numpy as np
+import os
 
+from tts_data_tools import file_io
+from tts_data_tools.utils import get_file_ids
 from tts_data_tools.wav_gen import world, reaper_f0, utils
+
+from tts_data_tools.scripts.mean_variance_normalisation import process as process_mvn
+
+WORLD_UNVOICED_VALUE = 0.
 
 
 def add_arguments(parser):
-    pass
+    parser.add_argument("--wav_dir", action="store", dest="wav_dir", type=str, required=True,
+                        help="Directory of the wave files to be converted.")
+    parser.add_argument("--id_list", action="store", dest="id_list", type=str, default=None,
+                        help="List of file ids to process (must be contained in lab_dir).")
+    parser.add_argument("--out_dir", action="store", dest="out_dir", type=str, required=True,
+                        help="Directory to save the output to.")
+    parser.add_argument("--calculate_normalisation", action="store_true", dest="calculate_normalisation", default=False,
+                        help="Whether to automatically calculate MVN parameters after extracting F0.")
+    parser.add_argument("--normalisation_of_deltas", action="store_true", dest="normalisation_of_deltas", default=False,
+                        help="Also calculate the MVN parameters for the delta and delta delta features.")
+
+
+def extract_vuv(f0):
+    return reaper_f0.extract_vuv(f0)
 
 
 def basic_analysis(wav, sample_rate):
@@ -41,7 +60,7 @@ def analysis(wav, sample_rate):
     """
     f0, sp, ap = basic_analysis(wav, sample_rate)
 
-    vuv = reaper_f0.extract_vuv(f0)
+    vuv = extract_vuv(f0)
     f0_interpolated = utils.interpolate(f0, vuv)
 
     return f0_interpolated, vuv, sp, ap
@@ -51,28 +70,45 @@ def synthesis(f0, vuv, sp, ap, sample_rate):
     return world.synthesis(f0, vuv, sp, ap, sample_rate)
 
 
-def main():
-    from tts_data_tools.file_io import save_bin, load_wav
+def process(wav_dir, id_list, out_dir, calculate_normalisation, normalisation_of_deltas):
+    """Processes wav files in id_list, saves the log-F0 and MVN parameters to files.
 
-    parser = argparse.ArgumentParser(description="Script to load wav files.")
-    parser.add_argument("--wav_file", action="store", dest="wav_file", type=str, required=True,
-                        help="File path of the wavfile to be vocoded.")
-    parser.add_argument("--out_file", action="store", dest="out_file", type=str, required=True,
-                        help="File path (without file extension) to save the vocoder features to.")
+    Args:
+        wav_dir (str): Directory containing the wav files.
+        id_list (str): List of file basenames to process.
+        out_dir (str): Directory to save the output to.
+        calculate_normalisation (bool): Whether to automatically calculate MVN parameters after extracting F0.
+        normalisation_of_deltas (bool): Also calculate the MVN parameters for the delta and delta delta features.
+    """
+    file_ids = get_file_ids(wav_dir, id_list)
+
+    for file_id in file_ids:
+        wav_path = os.path.join(wav_dir, '{}.wav'.format(file_id))
+        wav, sample_rate = file_io.load_wav(wav_path)
+
+        f0, vuv, sp, ap = analysis(wav, sample_rate)
+        lf0 = np.log(f0)
+
+        file_io.save_bin(lf0, os.path.join(out_dir, 'lf0', '{}.lf0'.format(file_id)))
+        file_io.save_bin(vuv, os.path.join(out_dir, 'vuv', '{}.vuv'.format(file_id)))
+        file_io.save_bin(sp, os.path.join(out_dir, 'sp', '{}.sp'.format(file_id)))
+        file_io.save_bin(ap, os.path.join(out_dir, 'ap', '{}.ap'.format(file_id)))
+
+    if calculate_normalisation:
+        process_mvn(out_dir, 'lf0', id_list=id_list, deltas=normalisation_of_deltas)
+        process_mvn(out_dir, 'so', id_list=id_list, deltas=normalisation_of_deltas)
+        process_mvn(out_dir, 'ap', id_list=id_list, deltas=normalisation_of_deltas)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Extracts log-F0, V/UV, smoothed spectrogram, and aperiodicity using WORLD and Reaper.")
     add_arguments(parser)
     args = parser.parse_args()
 
-    wav, sample_rate = load_wav(args.wav_file)
-    f0, vuv, sp, ap = analysis(wav, sample_rate)
-
-    save_bin(f0, '{}.f0'.format(args.out_file))
-    save_bin(vuv, '{}.vuv'.format(args.out_file))
-    save_bin(sp, '{}.sp'.format(args.out_file))
-    save_bin(ap, '{}.ap'.format(args.out_file))
+    process(args.wav_dir, args.id_list, args.out_dir, args.calculate_normalisation, args.normalisation_of_deltas)
 
 
 if __name__ == "__main__":
     main()
-
-
 

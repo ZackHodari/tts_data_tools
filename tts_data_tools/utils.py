@@ -2,8 +2,6 @@
 
 import os
 
-import numpy as np
-
 from tts_data_tools.file_io import load_lines
 
 
