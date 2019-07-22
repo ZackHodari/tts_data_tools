@@ -1,4 +1,4 @@
-"""Handles loading and saving to files, using binary files, or text files.
+"""Functional interface for loading/saving files with different formats.
 
 Usage:
     python file_io.py \
@@ -6,39 +6,11 @@ Usage:
         --out_file FILE [--out_file_encoding ENUM]
 """
 
-import argparse
-from enum import Enum
 import json
 import os
 from scipy.io import wavfile
 
 import numpy as np
-
-
-FileEncodingEnum = Enum("FileEncodingEnum", ("BIN", "TXT"))
-
-
-def infer_file_encoding(file_ext):
-    """Converts file_ext to a FileEncodingEnum."""
-    if file_ext in ['npy', 'lab', 'f0', 'lf0', 'sp', 'mgc', 'mfb', 'ap', 'bap']:
-        file_ext = 'bin'
-    if file_ext in ['dur']:
-        file_ext = 'txt'
-    return FileEncodingEnum[file_ext.upper()]
-
-
-def file_encoding_enum_type(astring):
-    try:
-        return infer_file_encoding(astring)
-    except KeyError:
-        msg = ', '.join([t.name.lower() for t in FileEncodingEnum])
-        msg = 'CustomEnumType: use one of {%s}'%msg
-        raise argparse.ArgumentTypeError(msg)
-
-
-def add_arguments(parser):
-    parser.add_argument("--feat_dim", action="store", dest="feat_dim", type=int, default=None,
-                        help="Dimensionality of the feature being loaded, required for load_bin.")
 
 
 def load_dir(load_fn, path, file_ids, feat_ext):
@@ -136,7 +108,7 @@ def load_wav(file_path):
     return data, sample_rate
 
 
-def save_wav(file_path, data, sample_rate):
+def save_wav(data, file_path, sample_rate):
     """Saves wave data to wavfile.
 
     Args:
@@ -228,60 +200,4 @@ def save_txt(data, file_path):
     lines = [' '.join(formatter(val) for val in row) + '\n' for row in array]
     with open(file_path, 'w') as f:
         f.writelines(lines)
-
-
-#
-# Functions to encapsulate the different file format options.
-#
-def load(file_path, file_encoding=None, feat_dim=None):
-    if file_encoding is None:
-        file_ext = file_path.split('.')[-1]
-        file_encoding = infer_file_encoding(file_ext)
-
-    if file_encoding == FileEncodingEnum.BIN:
-        return load_bin(file_path, feat_dim)
-
-    elif file_encoding == FileEncodingEnum.TXT:
-        return load_txt(file_path)
-
-    else:
-        raise NotImplementedError("Loading for file encoding '{}' not implemented".format(file_encoding))
-
-
-def save(data, file_path, file_encoding=None):
-    if file_encoding is None:
-        file_ext = file_path.split('.')[-1]
-        file_encoding = infer_file_encoding(file_ext)
-
-    if file_encoding == FileEncodingEnum.BIN:
-        save_bin(data, file_path)
-
-    elif file_encoding == FileEncodingEnum.TXT:
-        save_txt(data, file_path)
-
-    else:
-        raise NotImplementedError("Saving for file encoding '{}' not implemented".format(file_encoding))
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Script to load/save files in different encodings.")
-
-    parser.add_argument("--in_file_encoding", action="store", dest="in_file_encoding", type=file_encoding_enum_type,
-                        help="The encoding to load the file with.")
-    parser.add_argument("--out_file_encoding", action="store", dest="out_file_encoding", type=file_encoding_enum_type,
-                        help="The encoding to save the file with.")
-
-    parser.add_argument(
-        "--in_file", action="store", dest="in_file", type=str, required=True, help="Input file.")
-    parser.add_argument(
-        "--out_file", action="store", dest="out_file", type=str, required=True, help="Output file.")
-    add_arguments(parser)
-    args = parser.parse_args()
-
-    data = load(args.in_file, args.in_file_encoding, args.feat_dim)
-    save(data, args.out_file, args.out_file_encoding)
-
-
-if __name__ == "__main__":
-    main()
 
