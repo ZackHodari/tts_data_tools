@@ -125,33 +125,24 @@ def save_wav(data, file_path, sample_rate):
 #
 # Numpy binary files.
 #
-def load_bin(file_path, feat_dim, dtype=np.float32):
+def load_bin(file_path):
     """Loads data from a binary file using numpy.
 
     Args:
         file_path (str): File to load the data from.
-        feat_dim (int): Dimensionality of the frame-level feature vectors.
 
     Returns:
         (np.ndarray) Sequence of frame-level vectors/floats/ints."""
-    flat_data = np.fromfile(file_path, dtype=dtype)
-    return flat_data.reshape((-1, feat_dim))
+    return np.load(file_path)
 
 
 def save_bin(data, file_path):
     """Saves data as a binary file using numpy.
 
     Args:
-        data (np.ndarray): Sequence of frame-level vectors/floats/ints.
+        data (np.ndarray): Data to be saved.
         file_path (str): File to save the data to."""
-    array = sanitise_array(data)
-
-    if np.issubdtype(array.dtype, np.floating):
-        array = array.astype(np.float32)
-    elif np.issubdtype(array.dtype, np.integer):
-        array = array.astype(np.int32)
-
-    array.tofile(file_path)
+    np.save(file_path, data)
 
 
 #

@@ -1,4 +1,4 @@
-"""Runs the feature extraction on the waveforms and binarises the label files.
+"""Extracts linguistic and acoustic features.
 
 Usage:
     python process.py \
@@ -11,16 +11,15 @@ Usage:
 import argparse
 import numpy as np
 import os
+from tqdm import tqdm
 
 from tts_data_tools import file_io
 from tts_data_tools import lab_features
 from tts_data_tools import utils
 from tts_data_tools.wav_gen import world_with_reaper_f0
 
-from tts_data_tools.scripts.mean_variance_normalisation import calculate_mvn_parameters
-from tts_data_tools.scripts.min_max_normalisation import calculate_minmax_parameters
-from tts_data_tools.scripts.save_features import save_numerical_labels, save_counter_features, save_phones, \
-    save_durations, save_n_frames, save_n_phones, save_lf0, save_vuv, save_sp, save_ap
+from tts_data_tools.scripts.mean_variance_normalisation import process as process_mvn
+from tts_data_tools.scripts.min_max_normalisation import process as process_minmax
 
 
 def add_arguments(parser):
@@ -45,59 +44,6 @@ def add_arguments(parser):
     lab_features.add_arguments(parser)
 
 
-def extract_from_dataset(file_ids, lab_dir, wav_dir, state_level, question_file, upsample, subphone_feat_type):
-    question_set = lab_features.QuestionSet(question_file)
-    subphone_feature_set = lab_features.SubphoneFeatureSet(subphone_feat_type)
-
-    @utils.multithread(_lab_dir=lab_dir, _wav_dir=wav_dir, _state_level=state_level,
-                       _question_set=question_set, _upsample=upsample,
-                       _subphone_feature_set=subphone_feature_set)
-    def extract(file_id, _lab_dir, _wav_dir, _state_level, _question_set, _upsample, _subphone_feature_set):
-        lab_path = os.path.join(_lab_dir, '{}.lab'.format(file_id))
-        label = lab_features.Label(lab_path, _state_level)
-
-        numerical_label = label.extract_numerical_labels(_question_set, upsample_to_frame_level=_upsample)
-        counter_feature = label.extract_counter_features(_subphone_feature_set)
-        phones = label.phones
-        duration = label.phone_durations.reshape((-1, 1))
-        n_frame = np.sum(duration).item()
-        n_phone = len(label.phones)
-
-        wav_path = os.path.join(_wav_dir, '{}.wav'.format(file_id))
-        wav, sample_rate = file_io.load_wav(wav_path)
-
-        f0, vuv, sp, ap = world_with_reaper_f0.analysis(wav, sample_rate)
-        lf0 = np.log(f0)
-
-        # Often the durations from forced alignment are a few frames longer than the vocoder features.
-        diff = n_frame - f0.shape[0]
-        if diff > len(duration):
-            raise ValueError("Number of label frames and vocoder frames is too different for {name}\n"
-                             "\tvocoder frames {voc}\n"
-                             "\tlabel frames {lab}\n"
-                             "\tnumber of phones {phones}"
-                             .format(name=file_id, voc=f0.shape[0], lab=n_frame, phones=len(duration)))
-
-        # Remove excess durations if there is a shape mismatch.
-        if diff > 0:
-            # Remove 1 frame from each phone's duration starting at the end of the sequence.
-            duration[-diff:] -= 1
-            n_frame = f0.shape[0]
-            print("Cropped {} frames from durations and  for utterance {}".format(diff, file_id))
-
-        assert n_frame == np.sum(duration).item()
-
-        counter_feature = counter_feature[:n_frame]
-        lf0 = lf0[:n_frame]
-        vuv = vuv[:n_frame]
-        sp = sp[:n_frame]
-        ap = ap[:n_frame]
-
-        return numerical_label, counter_feature, phones, duration, n_frame, n_phone, lf0, vuv, sp, ap
-
-    return zip(*extract(file_ids))
-
-
 def process(lab_dir, wav_dir, id_list, out_dir,
             state_level, question_file, upsample, subphone_feat_type, calculate_normalisation, normalisation_of_deltas):
     """Processes wav files in id_list, saves the log-F0 and MVN parameters to files.
@@ -119,36 +65,93 @@ def process(lab_dir, wav_dir, id_list, out_dir,
         subphone_feat_type (str): Subphone features to be extracted from the durations.
         calculate_normalisation (bool): Whether to automatically calculate MVN parameters after extracting F0.
         normalisation_of_deltas (bool): Also calculate the MVN parameters for the delta and delta delta features.
-        """
+    """
     file_ids = utils.get_file_ids(lab_dir, id_list)
     _file_ids = utils.get_file_ids(wav_dir, id_list)
 
     if len(file_ids) != len(_file_ids) or sorted(file_ids) != sorted(_file_ids):
         raise ValueError("Please provide id_list, or ensure that wav_dir and lab_dir contain the same files.")
 
-    numerical_labels, counter_features, phones, durations, n_frames, n_phones, lf0_list, vuv_list, sp_list, ap_list = \
-        extract_from_dataset(file_ids, lab_dir, wav_dir, state_level, question_file, upsample, subphone_feat_type)
+    question_set = lab_features.QuestionSet(question_file)
+    subphone_feature_set = lab_features.SubphoneFeatureSet(subphone_feat_type)
 
-    save_numerical_labels(file_ids, numerical_labels, out_dir)
-    save_counter_features(file_ids, counter_features, out_dir)
-    save_phones(file_ids, phones, out_dir)
-    save_durations(file_ids, durations, out_dir)
-    save_n_frames(file_ids, n_frames, out_dir)
-    save_n_phones(file_ids, n_phones, out_dir)
+    os.makedirs(os.path.join(out_dir, 'lab'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'counters'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'dur'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'phones'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'n_frames'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'n_phones'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'lf0'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'vuv'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'sp'), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, 'ap'), exist_ok=True)
 
-    save_lf0(file_ids, lf0_list, out_dir)
-    save_vuv(file_ids, vuv_list, out_dir)
-    save_sp(file_ids, sp_list, out_dir)
-    save_ap(file_ids, ap_list, out_dir)
+    for file_id in tqdm(file_ids):
+        # Label processing.
+        lab_path = os.path.join(lab_dir, '{}.lab'.format(file_id))
+        label = lab_features.Label(lab_path, state_level)
+
+        numerical_labels = label.extract_numerical_labels(question_set, upsample_to_frame_level=upsample)
+        counter_features = label.extract_counter_features(subphone_feature_set)
+        durations = label.phone_durations.reshape((-1, 1))
+        phones = label.phones
+
+        n_frames = np.sum(durations).item()
+        n_phones = len(label.phones)
+
+        # Acoustic processing.
+        wav_path = os.path.join(wav_dir, '{}.wav'.format(file_id))
+        wav, sample_rate = file_io.load_wav(wav_path)
+
+        f0, vuv, sp, ap = world_with_reaper_f0.analysis(wav, sample_rate)
+        lf0 = np.log(f0)
+
+        # Match the number of frames between label forced-alignment and vocoder analysis.
+        # Often the durations from forced alignment are a few frames longer than the vocoder features.
+        diff = n_frames - f0.shape[0]
+        if diff > n_phones:
+            raise ValueError("Number of label frames and vocoder frames is too different for {name}\n"
+                             "\tlabel frames {lab}\n"
+                             "\tvocoder frames {voc}\n"
+                             "\tnumber of phones {phones}"
+                             .format(name=file_id, lab=n_frames, voc=f0.shape[0], phones=n_phones))
+
+        # Remove excess durations if there is a shape mismatch.
+        if diff > 0:
+            # Remove 1 frame from each phone's duration starting at the end of the sequence.
+            durations[-diff:] -= 1
+            n_frames = f0.shape[0]
+            print("Cropped {} frames from durations and  for utterance {}".format(diff, file_id))
+
+        assert n_frames == np.sum(durations).item()
+
+        counter_features = counter_features[:n_frames]
+        lf0 = lf0[:n_frames]
+        vuv = vuv[:n_frames]
+        sp = sp[:n_frames]
+        ap = ap[:n_frames]
+
+        file_io.save_bin(numerical_labels, os.path.join(out_dir, 'lab', file_id))
+        file_io.save_bin(counter_features, os.path.join(out_dir, 'counters', file_id))
+        file_io.save_txt(durations, os.path.join(out_dir, 'dur', '{}.txt'.format(file_id)))
+        file_io.save_lines(phones, os.path.join(out_dir, 'phones', '{}.txt'.format(file_id)))
+
+        file_io.save_txt(n_frames, os.path.join(out_dir, 'n_frames', '{}.txt'.format(file_id)))
+        file_io.save_txt(n_phones, os.path.join(out_dir, 'n_phones', '{}.txt'.format(file_id)))
+
+        file_io.save_bin(lf0, os.path.join(out_dir, 'lf0', file_id))
+        file_io.save_bin(vuv, os.path.join(out_dir, 'vuv', file_id))
+        file_io.save_bin(sp, os.path.join(out_dir, 'sp', file_id))
+        file_io.save_bin(ap, os.path.join(out_dir, 'ap', file_id))
 
     if calculate_normalisation:
-        calculate_minmax_parameters(numerical_labels, out_dir, feat_name='lab')
-        calculate_minmax_parameters(counter_features, out_dir, feat_name='counters')
-        calculate_mvn_parameters(durations, out_dir, feat_name='dur', deltas=False)
+        process_minmax(out_dir, 'lab', id_list, ext='npy')
+        process_minmax(out_dir, 'counters', id_list, ext='npy')
+        process_mvn(out_dir, 'dur', is_npy=False, id_list=id_list, deltas=False, ext='txt')
 
-        calculate_mvn_parameters(lf0_list, out_dir, feat_name='lf0', deltas=normalisation_of_deltas)
-        calculate_mvn_parameters(sp_list, out_dir, feat_name='sp', deltas=normalisation_of_deltas)
-        calculate_mvn_parameters(ap_list, out_dir, feat_name='ap', deltas=normalisation_of_deltas)
+        process_mvn(out_dir, 'lf0', id_list=id_list, deltas=normalisation_of_deltas, ext='npy')
+        process_mvn(out_dir, 'sp', id_list=id_list, deltas=normalisation_of_deltas, ext='npy')
+        process_mvn(out_dir, 'ap', id_list=id_list, deltas=normalisation_of_deltas, ext='npy')
 
 
 def main():

@@ -1,94 +1,17 @@
 """Utility functions for various tools."""
 
-from contextlib import contextmanager
-from functools import partial, wraps
-from multiprocessing.pool import ThreadPool
 import os
-import sys
-from tqdm import tqdm
+
+import numpy as np
 
 from tts_data_tools.file_io import load_lines
 
 
-class DummyTqdmFile(object):
-    """Dummy file-like that will write to tqdm"""
-    file = None
-
-    def __init__(self, file):
-        self.file = file
-
-    def write(self, x):
-        # Avoid print() second call (useless \n)
-        if len(x.rstrip()) > 0:
-            tqdm.write(x, file=self.file)
-
-    def flush(self):
-        return getattr(self.file, "flush", lambda: None)()
-
-
-@contextmanager
-def tqdm_redirect_std():
-    """Context manager that redirects print statements to DummyTqdmFile instances, ensuring progress bar is visible."""
-    orig_out_err = sys.stdout, sys.stderr
-    try:
-        sys.stdout, sys.stderr = map(DummyTqdmFile, orig_out_err)
-        yield orig_out_err[0]
-
-    # Relay exceptions
-    except Exception as exc:
-        raise exc
-
-    # Always restore sys.stdout/err if necessary
-    finally:
-        sys.stdout, sys.stderr = orig_out_err
-
-
-def multithread(chunksize=1, **kwargs):
-    """Uses Python multithreading to perform func over arg_list in parallel.
-
-    Callable Args:
-        args_list (list<args>): A list where each item are valid argument(s) for func, e.g. args_list can be file_ids.
-    """
-    def wrap_kwargs(func):
-        @wraps(func)
-        def wrap_func(args_list):
-            results = []
-            func_with_kwargs = partial(func, **kwargs)
-            pool = ThreadPool()
-            with tqdm_redirect_std() as orig_stdout:
-                for result in tqdm(pool.imap(func_with_kwargs, args_list, chunksize=chunksize),
-                                   total=len(args_list), file=orig_stdout, dynamic_ncols=True):
-                    results.append(result)
-            pool.close()
-            pool.join()
-
-            return results
-
-        return wrap_func
-    return wrap_kwargs
-
-
-def singlethread(**kwargs):
-    """Calls func for all items in args_list, but not in parallel.
-
-    This function exists multithread decorator can be replaced without changing any other code.
-
-    Callable Args:
-        args_list (list<args>): A list where each item are valid argument(s) for func, e.g. args_list can be file_ids.
-    """
-    def wrap_kwargs(func):
-        @wraps(func)
-        def wrap_func(args_list):
-            results = []
-            with tqdm_redirect_std() as orig_stdout:
-                for args in tqdm(args_list, file=orig_stdout, dynamic_ncols=True):
-                    result = func(args, **kwargs)
-                    results.append(result)
-
-            return results
-
-        return wrap_func
-    return wrap_kwargs
+def listify(object_or_list):
+    r"""Converts input to an iterable if it is not already one."""
+    if not isinstance(object_or_list, (list, tuple)):
+        object_or_list = [object_or_list]
+    return object_or_list
 
 
 def get_file_ids(file_dir=None, id_list=None):

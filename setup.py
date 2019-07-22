@@ -1,6 +1,5 @@
 from setuptools import setup
 
-script_def = 'tdt_{name} = tts_data_tools.scripts.{name}:main'
 
 setup(
     name='tts_data_tools',
@@ -12,6 +11,7 @@ setup(
     # license='MIT',
     install_requires=[
         'numpy',
+        'scipy',
         'pyworld',
         'pyreaper',
         'tqdm'
@@ -26,21 +26,14 @@ setup(
         'question_sets/questions-japanese.hed'
     ]},
     entry_points={'console_scripts': [
-        'tdt_file_io = tts_data_tools.file_io:main',
         'tdt_lab_features = tts_data_tools.lab_features:main',
-        'tdt_wav_features = tts_data_tools.wav_features:main',
-        script_def.format(name='extract_counters'),
-        script_def.format(name='extract_durations'),
-        script_def.format(name='extract_lf0_and_vuv_reaper'),
-        script_def.format(name='extract_numerical_labels'),
-        script_def.format(name='extract_numerical_labels_and_durations'),
-        script_def.format(name='extract_phones'),
-        script_def.format(name='extract_world'),
-        script_def.format(name='mean_variance_normalisation'),
-        script_def.format(name='min_max_normalisation'),
-        script_def.format(name='process_acoustics'),
-        script_def.format(name='process_dataset'),
-        script_def.format(name='process_labels')
+        'tdt_world = tts_data_tools.wav_gen.world:main',
+        'tdt_reaper_f0 = tts_data_tools.wav_gen.reaper_f0:main',
+        'tdt_world_with_reaper_f0 = tts_data_tools.wav_gen.world_with_reaper_f0:main',
+        'tdt_mean_variance_normalisation = tts_data_tools.scripts.mean_variance_normalisation:main',
+        'tdt_min_max_normalisation = tts_data_tools.scripts.min_max_normalisation:main',
+        'tdt_process_dataset = tts_data_tools.scripts.process_dataset:main',
+        'tdt_process_phones = tts_data_tools.scripts.process_phones:main',
     ]}
 )
 
