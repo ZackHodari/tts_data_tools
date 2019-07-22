@@ -13,18 +13,26 @@ from scipy.io import wavfile
 import numpy as np
 
 
-def load_dir(load_fn, path, file_ids, feat_ext):
+def load_dir(load_fn, path, file_ids, feat_ext=None):
     for file_id in file_ids:
-        file_path = os.path.join(path, '{}.{}'.format(file_id, feat_ext))
+
+        if feat_ext is not None:
+            file_id = '{}.{}'.format(file_id, feat_ext)
+        file_path = os.path.join(path, file_id)
+
         datum = load_fn(file_path)
         yield datum
 
 
-def save_dir(save_fn, path, data, file_ids, feat_ext):
+def save_dir(save_fn, path, data, file_ids, feat_ext=None):
     os.makedirs(path, exist_ok=True)
 
     for datum, file_id in zip(data, file_ids):
-        file_path = os.path.join(path, '{}.{}'.format(file_id, feat_ext))
+
+        if feat_ext is not None:
+            file_id = '{}.{}'.format(file_id, feat_ext)
+        file_path = os.path.join(path, file_id)
+
         save_fn(datum, file_path)
 
 
