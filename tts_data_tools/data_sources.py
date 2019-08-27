@@ -70,7 +70,7 @@ class _DataSource(object):
         return os.path.join(data_dir, self.name, '{}.{}'.format(base_name, self.ext))
 
     def load_files(self, base_names, data_dir):
-        for base_name in zip(base_names):
+        for base_name in base_names:
             yield self.load_file(base_name, data_dir)
 
     def save_files(self, data, base_names, data_dir):
@@ -275,7 +275,7 @@ class WavSource(_DataSource):
         if self.sample_rate is None:
             self.sample_rate = sample_rate
 
-        return feature
+        return feature.reshape(-1, 1)
 
     def save_file(self, data, base_name, data_dir):
         r"""Saves the feature as a wavfile using scipy.io.wavfile.write
