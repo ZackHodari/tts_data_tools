@@ -4,8 +4,6 @@ import os
 
 import numpy as np
 
-from tts_data_tools.file_io import load_lines
-
 
 def listify(object_or_list):
     r"""Converts input to an iterable if it is not already one."""
@@ -31,13 +29,26 @@ def get_file_ids(file_dir=None, id_list=None):
     if id_list is None:
         file_ids = _file_ids
     else:
-        file_ids = load_lines(id_list)
+        with open(id_list, 'r') as f:
+            file_ids = list(filter(bool, map(str.strip, f.readlines())))
 
         # Check that `file_ids` is a subset of `_file_ids`
         if (file_dir is not None) and (not set(file_ids).issubset(_file_ids)):
             raise ValueError("All basenames in id_list '{}' must be present in file_dir '{}'".format(id_list, file_dir))
 
     return file_ids
+
+
+def make_dirs(file_dir, file_ids):
+    """Creates directories for file_ids with a nested structure.
+
+    Args:
+        file_dir (str): Directory under which to create nested structure from id_list.
+        file_ids (list[str]): Basenames of files, if these are paths then a nested structure will be created.
+    """
+    dir_names = map(lambda d: '/'.join(d.split('/')[:-1]), file_ids)
+    for dir_name in set(dir_names):
+        os.makedirs(os.path.join(file_dir, dir_name), exist_ok=True)
 
 
 def string_to_ascii(strings, max_len=None):

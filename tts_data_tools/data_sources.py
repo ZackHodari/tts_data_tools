@@ -74,7 +74,7 @@ class _DataSource(object):
             yield self.load_file(base_name, data_dir)
 
     def save_files(self, data, base_names, data_dir):
-        os.makedirs(data_dir, exist_ok=True)
+        utils.make_dirs(data_dir, base_names)
 
         for datum, base_name in zip(data, base_names):
             self.save_file(datum, base_name, data_dir)

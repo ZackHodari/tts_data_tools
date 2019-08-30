@@ -12,6 +12,8 @@ from scipy.io import wavfile
 
 import numpy as np
 
+from tts_data_tools import utils
+
 
 def load_dir(load_fn, path, file_ids, feat_ext=None):
     for file_id in file_ids:
@@ -25,7 +27,7 @@ def load_dir(load_fn, path, file_ids, feat_ext=None):
 
 
 def save_dir(save_fn, path, data, file_ids, feat_ext=None):
-    os.makedirs(path, exist_ok=True)
+    utils.make_dirs(path, file_ids)
 
     for datum, file_id in zip(data, file_ids):
 

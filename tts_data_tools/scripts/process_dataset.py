@@ -66,25 +66,21 @@ def process(lab_dir, wav_dir, id_list, out_dir,
         calculate_normalisation (bool): Whether to automatically calculate MVN parameters after extracting F0.
         normalisation_of_deltas (bool): Also calculate the MVN parameters for the delta and delta delta features.
     """
-    file_ids = utils.get_file_ids(lab_dir, id_list)
-    _file_ids = utils.get_file_ids(wav_dir, id_list)
-
-    if len(file_ids) != len(_file_ids) or sorted(file_ids) != sorted(_file_ids):
-        raise ValueError("Please provide id_list, or ensure that wav_dir and lab_dir contain the same files.")
+    file_ids = utils.get_file_ids(id_list=id_list)
 
     question_set = lab_features.QuestionSet(question_file)
     subphone_feature_set = lab_features.SubphoneFeatureSet(subphone_feat_type)
 
-    os.makedirs(os.path.join(out_dir, 'lab'), exist_ok=True)
-    os.makedirs(os.path.join(out_dir, 'counters'), exist_ok=True)
-    os.makedirs(os.path.join(out_dir, 'dur'), exist_ok=True)
-    os.makedirs(os.path.join(out_dir, 'phones'), exist_ok=True)
-    os.makedirs(os.path.join(out_dir, 'n_frames'), exist_ok=True)
-    os.makedirs(os.path.join(out_dir, 'n_phones'), exist_ok=True)
-    os.makedirs(os.path.join(out_dir, 'lf0'), exist_ok=True)
-    os.makedirs(os.path.join(out_dir, 'vuv'), exist_ok=True)
-    os.makedirs(os.path.join(out_dir, 'sp'), exist_ok=True)
-    os.makedirs(os.path.join(out_dir, 'ap'), exist_ok=True)
+    utils.make_dirs(os.path.join(out_dir, 'lab'), file_ids)
+    utils.make_dirs(os.path.join(out_dir, 'counters'), file_ids)
+    utils.make_dirs(os.path.join(out_dir, 'dur'), file_ids)
+    utils.make_dirs(os.path.join(out_dir, 'phones'), file_ids)
+    utils.make_dirs(os.path.join(out_dir, 'n_frames'), file_ids)
+    utils.make_dirs(os.path.join(out_dir, 'n_phones'), file_ids)
+    utils.make_dirs(os.path.join(out_dir, 'lf0'), file_ids)
+    utils.make_dirs(os.path.join(out_dir, 'vuv'), file_ids)
+    utils.make_dirs(os.path.join(out_dir, 'sp'), file_ids)
+    utils.make_dirs(os.path.join(out_dir, 'ap'), file_ids)
 
     for file_id in tqdm(file_ids):
         # Label processing.
