@@ -35,7 +35,7 @@ def process(lab_dir, id_list, out_dir, state_level):
         out_dir (str): Directory to save the output to.
         state_level (bool): Indicates that the label files are state level if True, otherwise they are frame level.
     """
-    file_ids = utils.get_file_ids(lab_dir, id_list)
+    file_ids = utils.get_file_ids(id_list=id_list)
 
     for file_id in file_ids:
         # Label processing.

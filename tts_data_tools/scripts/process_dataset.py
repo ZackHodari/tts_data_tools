@@ -141,13 +141,13 @@ def process(lab_dir, wav_dir, id_list, out_dir,
         file_io.save_bin(ap, os.path.join(out_dir, 'ap', file_id))
 
     if calculate_normalisation:
-        process_minmax(out_dir, 'lab', id_list, ext='npy')
-        process_minmax(out_dir, 'counters', id_list, ext='npy')
-        process_mvn(out_dir, 'dur', is_npy=False, id_list=id_list, deltas=False, ext='txt')
+        process_minmax(out_dir, 'lab', id_list, out_dir=out_dir)
+        process_minmax(out_dir, 'counters', id_list, out_dir=out_dir)
+        process_mvn(out_dir, 'dur', is_npy=False, id_list=id_list, deltas=False, out_dir=out_dir)
 
-        process_mvn(out_dir, 'lf0', id_list=id_list, deltas=normalisation_of_deltas, ext='npy')
-        process_mvn(out_dir, 'sp', id_list=id_list, deltas=normalisation_of_deltas, ext='npy')
-        process_mvn(out_dir, 'ap', id_list=id_list, deltas=normalisation_of_deltas, ext='npy')
+        process_mvn(out_dir, 'lf0', id_list=id_list, deltas=normalisation_of_deltas, out_dir=out_dir)
+        process_mvn(out_dir, 'sp', id_list=id_list, deltas=normalisation_of_deltas, out_dir=out_dir)
+        process_mvn(out_dir, 'ap', id_list=id_list, deltas=normalisation_of_deltas, out_dir=out_dir)
 
 
 def main():
