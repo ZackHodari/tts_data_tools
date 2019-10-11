@@ -1,3 +1,4 @@
+from tts_data_tools import data_sources
 from tts_data_tools import file_io
 from tts_data_tools import lab_features
 from tts_data_tools import utils

@@ -16,9 +16,6 @@ class _DataSource(object):
     ----------
     name : str
         Name of directory that will contain this feature.
-    normalisation : None or str
-        Type of normalisation to perform. This allows the type of normalisation to be specified, but the normaliser
-        itself will not be contained within the data source, that must be handled outside of the data source.
     use_deltas : bool
         Whether to compute delta features.
     ext : str, optional
@@ -54,14 +51,9 @@ class _DataSource(object):
     There can be multiple `data_dir` directories, e.g. one for each data split (train, valid, test).
 
     Each feature should have a directory within `data_dir`, this will contain all files for this feature.
-
-    While normalisation is not handled here, you should ensure there are files present containing the normalisation
-    parameters, e.g. 'lf0_mvn.json'. Such files should exist for all data sources requiring normalisation, with an
-    additional file for all data sources using delta features.
     """
-    def __init__(self, name, normalisation=None, use_deltas=False, ext=None):
+    def __init__(self, name, use_deltas=False, ext=None):
         self.name = name
-        self.normalisation = normalisation
         self.use_deltas = use_deltas
         self.ext = ext if ext is not None else name
 
@@ -145,7 +137,7 @@ class StringSource(_DataSource):
         The file extension of the saved features, if not set `name` is used.
     """
     def __init__(self, name, ext='txt'):
-        super(StringSource, self).__init__(name, normalisation=None, use_deltas=False, ext=ext)
+        super(StringSource, self).__init__(name, use_deltas=False, ext=ext)
 
     def load_file(self, base_name, data_dir):
         r"""Loads lines of text.
@@ -239,19 +231,16 @@ class WavSource(_DataSource):
     ----------
     name : str
         Name of directory that will contain this feature.
-    normalisation : str
-        Type of normalisation to perform. This allows the type of normalisation to be specified, but the normaliser
-        itself will not be contained within the data source, that must be handled outside of the data source.
     use_deltas : bool
-        Whether to compute delta features. If normalisation is being used it will also perform normalisation of deltas.
+        Whether to compute delta features.
 
     Attributes
     ----------
     sample_rate : int
         The sample rate of the wavfiles being loaded, if not given this will be set in `self.load_file`.
     """
-    def __init__(self, name, normalisation=None, use_deltas=False, sample_rate=None):
-        super(WavSource, self).__init__(name, normalisation, use_deltas, ext='wav')
+    def __init__(self, name, use_deltas=False, sample_rate=None):
+        super(WavSource, self).__init__(name, use_deltas, ext='wav')
 
         self.sample_rate = sample_rate
 
@@ -300,16 +289,13 @@ class NumpyBinarySource(_DataSource):
     ----------
     name : str
         Name of directory that will contain this feature.
-    normalisation : str
-        Type of normalisation to perform. This allows the type of normalisation to be specified, but the normaliser
-        itself will not be contained within the data source, that must be handled outside of the data source.
     use_deltas : bool
-        Whether to compute delta features. If normalisation is being used it will also perform normalisation of deltas.
+        Whether to compute delta features.
     ext : str, optional
         The file extension of the saved features, if not set `name` is used.
     """
-    def __init__(self, name, normalisation=None, use_deltas=False, ext='npy'):
-        super(NumpyBinarySource, self).__init__(name, normalisation, use_deltas, ext)
+    def __init__(self, name, use_deltas=False, ext='npy'):
+        super(NumpyBinarySource, self).__init__(name, use_deltas, ext)
 
     def load_file(self, base_name, data_dir):
         r"""Loads the feature using `np.load`.
@@ -351,16 +337,13 @@ class TextSource(_DataSource):
     ----------
     name : str
         Name of directory that will contain this feature.
-    normalisation : str
-        Type of normalisation to perform. This allows the type of normalisation to be specified, but the normaliser
-        itself will not be contained within the data source, that must be handled outside of the data source.
     use_deltas : bool
-        Whether to compute delta features. If normalisation is being used it will also perform normalisation of deltas.
+        Whether to compute delta features.
     ext : str, optional
         The file extension of the saved features, if not set `name` is used.
     """
-    def __init__(self, name, normalisation=None, use_deltas=False, ext='txt'):
-        super(TextSource, self).__init__(name, normalisation, use_deltas, ext)
+    def __init__(self, name, use_deltas=False, ext='txt'):
+        super(TextSource, self).__init__(name, use_deltas, ext)
 
     def load_file(self, base_name, data_dir):
         r"""Loads the feature from a text file into a numpy array.
