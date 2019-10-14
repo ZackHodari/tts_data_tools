@@ -12,8 +12,9 @@ import argparse
 import os
 
 from tts_data_tools import file_io
-from tts_data_tools import lab_features
+from tts_data_tools import lab_gen
 from tts_data_tools import utils
+from tts_data_tools.lab_gen import lab_to_feat
 
 
 def add_arguments(parser):
@@ -23,7 +24,7 @@ def add_arguments(parser):
                         help="List of file ids to process (must be contained in lab_dir).")
     parser.add_argument("--out_dir", action="store", dest="out_dir", type=str, required=True,
                         help="Directory to save the output to.")
-    lab_features.add_arguments(parser)
+    lab_gen.add_arguments(parser)
 
 
 def process(lab_dir, id_list, out_dir, state_level):
@@ -40,7 +41,7 @@ def process(lab_dir, id_list, out_dir, state_level):
     for file_id in file_ids:
         # Label processing.
         lab_path = os.path.join(lab_dir, '{}.lab'.format(file_id))
-        label = lab_features.Label(lab_path, state_level)
+        label = lab_to_feat.Label(lab_path, state_level)
 
         phones = label.phones
         n_phones = len(label.phones)

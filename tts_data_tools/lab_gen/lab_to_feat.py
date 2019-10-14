@@ -1,7 +1,7 @@
 """Handles loading and modifying label files.
 
 Usage:
-    python lab_features.py \
+    python lab_to_feat.py \
         --lab_file FILE [--state_level] \
         --question_file FILE [--subphone_feat_type STR] \
         --out_file FILE
@@ -17,6 +17,7 @@ import numpy as np
 from scipy.stats import norm
 
 from tts_data_tools import file_io
+from tts_data_tools import lab_gen
 from tts_data_tools.utils import get_file_ids
 
 from tts_data_tools.scripts.mean_variance_normalisation import process as process_mvn
@@ -31,9 +32,21 @@ SubphoneFeatureTypeEnum = Enum(
 
 
 def add_arguments(parser):
-    parser.add_argument("--state_level", dest="state_level", action="store_true", default=True,
-                        help="Is the label file state level (or frame level).")
-    parser.add_argument("--no-state_level", dest="state_level", action="store_false", help=argparse.SUPPRESS)
+    parser.add_argument("--lab_dir", action="store", dest="lab_dir", type=str, required=True,
+                        help="Directory of the label files to be converted.")
+    parser.add_argument("--id_list", action="store", dest="id_list", type=str, default=None,
+                        help="List of file ids to process (must be contained in lab_dir).")
+    parser.add_argument("--out_dir", action="store", dest="out_dir", type=str, required=True,
+                        help="Directory to save the output to.")
+    parser.add_argument("--question_file", action="store", dest="question_file", type=str, required=True,
+                        help="File containing the '.hed' question set to query the labels with.")
+    parser.add_argument("--upsample_to_frame_level", action="store_true", dest="upsample_to_frame_level", default=False,
+                        help="Whether to upsample the numerical labels to frame-level.")
+    parser.add_argument("--subphone_feat_type", action="store", dest="subphone_feat_type", type=str, default=None,
+                        help="The type of subphone counter features.")
+    parser.add_argument("--calculate_normalisation", action="store_true", dest="calculate_normalisation", default=False,
+                        help="Whether to automatically calculate MVN parameters after extracting label features.")
+    lab_gen.add_arguments(parser)
 
 
 class QuestionSet(object):
@@ -56,8 +69,10 @@ class QuestionSet(object):
                 questions-mandarin.hed
                 questions-japanese.hed
         """
-        if file_path in pkg_resources.resource_listdir('tts_data_tools', 'question_sets'):
-            file_path = pkg_resources.resource_filename('tts_data_tools', os.path.join('question_sets', file_path))
+        if file_path in pkg_resources.resource_listdir('tts_data_tools', os.path.join('resources', 'question_sets')):
+            print(f'Using tts_data_tools resource from resources/question_sets for {file_path}')
+            file_path = pkg_resources.resource_filename('tts_data_tools',
+                                                        os.path.join('resources', 'question_sets', file_path))
 
         self.file_path = file_path
         self.lines = file_io.load_lines(self.file_path)
@@ -480,7 +495,7 @@ class Label(object):
 
         Returns:
             (list<str>): List of phone identities."""
-        current_phone_regex = re.compile('\-(.+?)\+')
+        current_phone_regex = re.compile('-(.+?)\+')
 
         phones = []
         for label in self.labels:
@@ -656,20 +671,6 @@ def process(lab_dir, id_list, out_dir, state_level,
 def main():
     parser = argparse.ArgumentParser(
         description="Extracts numerical labels, counter features, and durations from forced alignment labels files.")
-    parser.add_argument("--lab_dir", action="store", dest="lab_dir", type=str, required=True,
-                        help="Directory of the label files to be converted.")
-    parser.add_argument("--id_list", action="store", dest="id_list", type=str, default=None,
-                        help="List of file ids to process (must be contained in lab_dir).")
-    parser.add_argument("--out_dir", action="store", dest="out_dir", type=str, required=True,
-                        help="Directory to save the output to.")
-    parser.add_argument("--question_file", action="store", dest="question_file", type=str, required=True,
-                        help="File containing the '.hed' question set to query the labels with.")
-    parser.add_argument("--upsample_to_frame_level", action="store_true", dest="upsample_to_frame_level", default=False,
-                        help="Whether to upsample the numerical labels to frame-level.")
-    parser.add_argument("--subphone_feat_type", action="store", dest="subphone_feat_type", type=str, default=None,
-                        help="The type of subphone counter features.")
-    parser.add_argument("--calculate_normalisation", action="store_true", dest="calculate_normalisation", default=False,
-                        help="Whether to automatically calculate MVN parameters after extracting label features.")
     add_arguments(parser)
     args = parser.parse_args()
 

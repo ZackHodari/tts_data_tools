@@ -14,8 +14,9 @@ import os
 from tqdm import tqdm
 
 from tts_data_tools import file_io
-from tts_data_tools import lab_features
+from tts_data_tools import lab_gen
 from tts_data_tools import utils
+from tts_data_tools.lab_gen import lab_to_feat
 from tts_data_tools.wav_gen import world_with_reaper_f0
 
 from tts_data_tools.scripts.mean_variance_normalisation import process as process_mvn
@@ -41,7 +42,7 @@ def add_arguments(parser):
                         help="Whether to automatically calculate MVN parameters after extracting F0.")
     parser.add_argument("--normalisation_of_deltas", action="store_true", dest="normalisation_of_deltas", default=False,
                         help="Also calculate the MVN parameters for the delta and delta delta features.")
-    lab_features.add_arguments(parser)
+    lab_gen.add_arguments(parser)
 
 
 def process(lab_dir, wav_dir, id_list, out_dir,
@@ -68,8 +69,8 @@ def process(lab_dir, wav_dir, id_list, out_dir,
     """
     file_ids = utils.get_file_ids(id_list=id_list)
 
-    question_set = lab_features.QuestionSet(question_file)
-    subphone_feature_set = lab_features.SubphoneFeatureSet(subphone_feat_type)
+    question_set = lab_to_feat.QuestionSet(question_file)
+    subphone_feature_set = lab_to_feat.SubphoneFeatureSet(subphone_feat_type)
 
     utils.make_dirs(os.path.join(out_dir, 'lab'), file_ids)
     utils.make_dirs(os.path.join(out_dir, 'counters'), file_ids)
@@ -85,7 +86,7 @@ def process(lab_dir, wav_dir, id_list, out_dir,
     for file_id in tqdm(file_ids):
         # Label processing.
         lab_path = os.path.join(lab_dir, '{}.lab'.format(file_id))
-        label = lab_features.Label(lab_path, state_level)
+        label = lab_to_feat.Label(lab_path, state_level)
 
         numerical_labels = label.extract_numerical_labels(question_set, upsample_to_frame_level=upsample)
         counter_features = label.extract_counter_features(subphone_feature_set)
