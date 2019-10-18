@@ -42,7 +42,7 @@ def add_arguments(parser):
                         help="Directory to save the output to.")
 
 
-def utts_to_dumps(dumpfeats_exe, utt_dir, file_ids, out_dir,
+def utts_to_dumps(dumpfeats_exe, utt_dir, file_ids, dump_dir,
                   extra_feats_scm='extra_feats.scm', label_feats='label.feats'):
 
     if extra_feats_scm in pkg_resources.resource_listdir('tts_data_tools', os.path.join('resources', 'festival')):
@@ -55,25 +55,25 @@ def utts_to_dumps(dumpfeats_exe, utt_dir, file_ids, out_dir,
         label_feats = pkg_resources.resource_filename('tts_data_tools',
                                                       os.path.join('resources', 'festival', label_feats))
 
-    utils.make_dirs(out_dir, file_ids)
+    utils.make_dirs(dump_dir, file_ids)
 
     for file_id in file_ids:
         # Argument `check=True` ensures that an exception is raised if the process' return code is non-zero.
         subprocess.run([dumpfeats_exe,
                         '-eval', extra_feats_scm,
-                        '-relation' 'Segment',
+                        '-relation', 'Segment',
                         '-feats', label_feats,
-                        '-output', os.path.join(out_dir, f'{file_id}.txt'),
+                        '-output', os.path.join(dump_dir, f'{file_id}.txt'),
                         os.path.join(utt_dir, f'{file_id}.utt')], check=True)
 
 
-def dumps_to_labs(dump_dir, file_ids, out_dir, awk='label-full.awk'):
+def dumps_to_labs(dump_dir, file_ids, label_out_dir, awk='label-full.awk'):
 
     if awk in pkg_resources.resource_listdir('tts_data_tools', os.path.join('resources', 'festival')):
         print(f'Using tts_data_tools resource from resources/festival for {awk}')
         awk = pkg_resources.resource_filename('tts_data_tools', os.path.join('resources', 'festival', awk))
 
-    utils.make_dirs(out_dir, file_ids)
+    utils.make_dirs(label_out_dir, file_ids)
 
     for file_id in file_ids:
         # Argument `check=True` ensures that an exception is raised if the process' return code is non-zero.
@@ -81,15 +81,26 @@ def dumps_to_labs(dump_dir, file_ids, out_dir, awk='label-full.awk'):
                              check=True, stdout=subprocess.PIPE)
 
         # `stdout` was redirected with a pipe and stored in the return object `rtn` as a binary string.
-        with open(os.path.join(out_dir, f'{file_id}.lab'), 'wb') as f:
+        with open(os.path.join(label_out_dir, f'{file_id}.lab'), 'wb') as f:
             f.write(rtn.stdout)
 
 
-def mark_silences(label, current_phone_regex=re.compile('-(.+?)\+'), n_gram_size=2):
+def mark_silences(label, current_phone_regex=re.compile('-(.+?)\+'), n_gram_size=2, is_mono=False):
     phones = []
     is_silence = []
+
     for line in label:
-        phone = current_phone_regex.search(line).group(1)
+        if is_mono:
+            phone = line
+
+        else:
+            match = current_phone_regex.search(line)
+
+            if match is None:
+                raise ValueError(f'Regex failed for line,\n{line}')
+
+            phone = match.group(1)
+
         phones.append(phone)
         is_silence.append(phone in ['pau', 'sil'])
 
@@ -98,13 +109,16 @@ def mark_silences(label, current_phone_regex=re.compile('-(.+?)\+'), n_gram_size
 
     # Replace the pauses before and after the phone sequence with silences.
     for i, line in enumerate(label):
-        n_gram = line[:line.index('/A:')]
-        remaining_label = line[line.index('/A:'):]
+        if is_mono:
+            if i < first_phone_idx + n_gram_size or i > last_phone_idx - n_gram_size:
+                label[i] = line.replace('pau', 'sil')
 
-        if i < first_phone_idx + n_gram_size or i > last_phone_idx - n_gram_size:
-            n_gram.replace('pau', 'sil')
+        else:
+            n_gram = line[:line.index('/A')]
+            remaining_label = line[line.index('/A'):]
 
-        label[i] = n_gram + remaining_label
+            if i < first_phone_idx + n_gram_size or i > last_phone_idx - n_gram_size:
+                label[i] = n_gram.replace('pau', 'sil') + remaining_label
 
     return label
 
@@ -113,16 +127,16 @@ def round_dur(dur):
     return int(round(dur / 50000, 0) * 50000)
 
 
-def sanitise_labs(lab_dir, file_ids, out_dir, include_times=False, state_level=False):
+def sanitise_labs(lab_dir, file_ids, label_out_dir, include_times=False, state_level=False, is_mono=False):
 
-    utils.make_dirs(out_dir, file_ids)
+    utils.make_dirs(label_out_dir, file_ids)
 
     for file_id in file_ids:
         label = file_io.load_lines(os.path.join(lab_dir, f'{file_id}.lab'))
         n_phones = len(label)
 
-        start_times, end_times, label = zip(*map(str.split, label))
-        label = mark_silences(label)
+        start_times, end_times, label = map(list, zip(*map(str.split, label)))
+        label = mark_silences(label, is_mono=is_mono)
 
         if state_level:
             if include_times:
@@ -146,7 +160,7 @@ def sanitise_labs(lab_dir, file_ids, out_dir, include_times=False, state_level=F
 
             label = list(map(' '.join, zip(*[start_times, end_times, label])))
 
-        file_io.save_lines(label, os.path.join(out_dir, f'{file_id}.lab'))
+        file_io.save_lines(label, os.path.join(label_out_dir, f'{file_id}.lab'))
 
 
 def process(festival_dir, utt_dir, id_list, out_dir,
@@ -181,7 +195,7 @@ def process(festival_dir, utt_dir, id_list, out_dir,
 
     # Clean up the full-context label features: replace initial pauses with 'sil' and remove timestamps.
     sanitise_labs(label_full_dir, file_ids, label_no_align_dir, include_times=False, state_level=False)
-    sanitise_labs(label_mono_dir, file_ids, mono_no_align_dir, include_times=False, state_level=False)
+    sanitise_labs(label_mono_dir, file_ids, mono_no_align_dir, include_times=False, state_level=False, is_mono=True)
 
 
 def main():
