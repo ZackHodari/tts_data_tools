@@ -34,7 +34,7 @@ SubphoneFeatureTypeEnum = Enum(
 def add_arguments(parser):
     parser.add_argument("--lab_dir", action="store", dest="lab_dir", type=str, required=True,
                         help="Directory of the label files to be converted.")
-    parser.add_argument("--id_list", action="store", dest="id_list", type=str, default=None,
+    parser.add_argument("--id_list", action="store", dest="id_list", type=str, required=True,
                         help="List of file ids to process (must be contained in lab_dir).")
     parser.add_argument("--out_dir", action="store", dest="out_dir", type=str, required=True,
                         help="Directory to save the output to.")
@@ -569,7 +569,7 @@ class Label(object):
                     frame_in_phone_index += 1
                     frame_index += 1
 
-        print("Numerical labels created for {}: {} frames; {} subphone counter features."
+        print("Counter features created for {}: {} frames; {} subphone counter features."
               .format(self.base_name, n_frames, counter_dim))
 
         return counter_features
@@ -638,7 +638,7 @@ def process(lab_dir, id_list, out_dir, state_level,
         subphone_feat_type (str): Subphone features to be extracted from the durations.
         calculate_normalisation (bool): Calculate mean-variance and min-max normalisation for duration and labels.
     """
-    file_ids = get_file_ids(lab_dir, id_list)
+    file_ids = get_file_ids(id_list=id_list)
     question_set = QuestionSet(question_file)
     subphone_feature_set = SubphoneFeatureSet(subphone_feat_type)
 
