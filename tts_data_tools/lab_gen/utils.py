@@ -46,7 +46,7 @@ _T = 0o100000  # has third differential coefficients
 
 
 @contextmanager
-def open_htk(file_name, mode, veclen=13):
+def open_htk(file_name, mode, *args, **kwargs):
     r"""Open an HTK format feature file for reading or writing.
 
     The mode parameter is 'rb' (reading) or 'wb' (writing).
@@ -56,7 +56,7 @@ def open_htk(file_name, mode, veclen=13):
         file = HTKFeatRead(file_name)
 
     elif mode in ('w', 'wb'):
-        file = HTKFeatWrite(file_name, veclen)
+        file = HTKFeatWrite(file_name, *args, **kwargs)
 
     else:
         raise Exception("mode must be 'r', 'rb', 'w', or 'wb'")
@@ -77,7 +77,7 @@ class HTKFeatRead(object):
 
         self.n_samples = None
         self.samp_period = None
-        self.sampSize = None
+        self.samp_size = None
         self.param_kind = None
         self.dtype = None
         self.veclen = None
@@ -86,6 +86,16 @@ class HTKFeatRead(object):
         self.hdrlen = None
 
         self.read_header()
+
+    def __repr__(self):
+        return f'HTKFeatRead({self.file_name}, {self.veclen}, {self.samp_period}, {self.param_kind})'
+
+    def __del__(self):
+        if not self.file.closed:
+            self.close()
+
+    def close(self):
+        self.file.close()
 
     def __iter__(self):
         self.file.seek(12, 0)
@@ -96,12 +106,12 @@ class HTKFeatRead(object):
 
         spam = self.file.read(12)
 
-        self.n_samples, self.samp_period, self.sampSize, self.param_kind = unpack(">IIHH", spam)
+        self.n_samples, self.samp_period, self.samp_size, self.param_kind = unpack(">IIHH", spam)
 
         # Get coefficients for compressed data
         if self.param_kind & _C:
             self.dtype = 'h'
-            self.veclen = self.sampSize / 2
+            self.veclen = self.samp_size / 2
 
             if self.param_kind & 0x3f == IREFC:
                 self.A = 32767
@@ -117,13 +127,13 @@ class HTKFeatRead(object):
 
         else:
             self.dtype = 'f'
-            self.veclen = self.sampSize / 4
+            self.veclen = self.samp_size / 4
 
         self.hdrlen = self.file.tell()
         self.veclen = int(self.veclen)
 
     def seek(self, idx):
-        self.file.seek(self.hdrlen + idx * self.sampSize, 0)
+        self.file.seek(self.hdrlen + idx * self.samp_size, 0)
 
     def __next__(self):
         vec = np.fromfile(self.file, self.dtype, self.veclen)
@@ -176,15 +186,19 @@ class HTKFeatWrite(object):
 
         self.write_header()
 
+    def __repr__(self):
+        return f'HTKFeatWrite({self.file_name}, {self.veclen}, {self.samp_period}, {self.param_kind})'
+
     def __del__(self):
-        self.close()
+        if not self.file.closed:
+            self.close()
 
     def close(self):
         self.write_header()
         self.file.close()
 
     def write_header(self):
-        self.file.seek(0,0)
+        self.file.seek(0, 0)
         self.file.write(pack(">IIHH", self.file_size, self.samp_period, self.samp_size, self.param_kind))
 
     def write_vec(self, vec):
@@ -199,7 +213,7 @@ class HTKFeatWrite(object):
 
         self.file_size += self.veclen
 
-    def writ_eall(self, arr):
+    def write_all(self, arr):
         for row in arr:
             self.write_vec(row)
 

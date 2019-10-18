@@ -1,12 +1,14 @@
 """Handles conversion from Festival Utterance structures to flat HTS-style full-context labels.
 
 Usage:
-    python utt_to_lab.py \
-        --festival_dir DIR
-        [--txt_file FILE]
-        [--txt_dir DIR
-         --id_list FILE]
+    python align_lab.py \
+        --htk_dir DIR
+        --lab_dir DIR
+        --wav_dir DIR
+        --id_list FILE
         --out_file FILE
+        [--multiple_speaker]
+        [--num_train_processes INT]
 """
 
 import argparse
@@ -18,7 +20,7 @@ import subprocess
 
 from tts_data_tools import file_io
 from tts_data_tools.lab_gen import utils
-from tts_data_tools.utils import get_file_ids, make_dirs
+from tts_data_tools.utils import add_boolean_arg, get_file_ids, make_dirs
 
 from tts_data_tools.scripts.mean_variance_normalisation import calculate_mvn_parameters
 
@@ -46,24 +48,28 @@ def add_arguments(parser):
                         help="Directory to save the output to.")
     parser.add_argument("--multiple_speaker", action="store_true", dest="multiple_speaker", default=False,
                         help="Whether the data contains multiple speakers.")
-    parser.add_argument("--num_train_proccesses", action="store", dest="num_train_proccesses", type=str, default=4,
+    parser.add_argument("--num_train_proccesses", action="store", dest="num_train_proccesses", type=int, default=4,
                         help="Number of parallel processes to use for HMM training.")
+    add_boolean_arg(parser, 'prepare_data', 'Prepare for training: make file_id lists, convert labels to mono-lab, '
+                                            'extract MFCCs, normalise by speaker, and make the protos.')
+    add_boolean_arg(parser, 'train_hmm', 'Train the HMM.')
+    add_boolean_arg(parser, 'align', 'Align data using the trained HMM.')
 
 
 class ForcedAlignment(object):
 
     def __init__(self, htk_dir, lab_dir, wav_dir, id_list, out_dir):
-        self.HCompV = os.path.join(htk_dir, 'HCompV')
-        self.HCopy = os.path.join(htk_dir, 'HCopy')
-        self.HERest = os.path.join(htk_dir, 'HERest')
-        self.HHEd = os.path.join(htk_dir, 'HHEd')
-        self.HVite = os.path.join(htk_dir, 'HVite')
+        self.HCompV = os.path.join(htk_dir, 'bin', 'HCompV')
+        self.HCopy = os.path.join(htk_dir, 'bin', 'HCopy')
+        self.HERest = os.path.join(htk_dir, 'bin', 'HERest')
+        self.HHEd = os.path.join(htk_dir, 'bin', 'HHEd')
+        self.HVite = os.path.join(htk_dir, 'bin', 'HVite')
 
         self.wav_dir = wav_dir
         self.lab_dir = lab_dir
 
         self.file_ids = get_file_ids(id_list=id_list)
-        self.file_ids = self.check_file_ids(id_list)
+        self.file_ids = self.check_file_ids(self.file_ids)
 
         print('---preparing environment')
 
@@ -126,7 +132,7 @@ class ForcedAlignment(object):
         self.compute_mfccs()
 
         print('---feature_normalisation')
-        for speaker_mfc_paths in mfc_paths_by_speaker.items():
+        for speaker_mfc_paths in mfc_paths_by_speaker.values():
             self.normalise_inplace(speaker_mfc_paths)
 
         print('---making proto')
@@ -241,6 +247,9 @@ class ForcedAlignment(object):
                 data, n_samples = f.read_all()
                 data_list.append(data)
 
+                veclen = f.veclen
+                samp_period = f.samp_period
+
         # Compute mean and variance.
         mvn_params, _ = calculate_mvn_parameters(data_list)
 
@@ -248,23 +257,23 @@ class ForcedAlignment(object):
         for file_path, data in zip(file_paths, data_list):
             norm_data = (data - mvn_params['mean']) / mvn_params['std_dev']
 
-            with utils.open_htk(file_path, 'wb') as f:
+            with utils.open_htk(file_path, 'wb', veclen=veclen, samp_period=samp_period, param_kind=9) as f:
                 f.write_all(norm_data)
 
     def make_proto(self):
         # make proto
         means = ' '.join(['0.0' for _ in range(39)])
-        vars = ' '.join(['1.0' for _ in range(39)])
+        variances = ' '.join(['1.0' for _ in range(39)])
 
         with open(self.proto, 'w') as f:
             f.write('~o <VECSIZE> 39 <USER>\n'
                     '~h "proto"\n'
                     '<BEGINHMM>\n'
-                    '<NUMSTATES> 7')
+                    '<NUMSTATES> 7\n')
 
             for i in range(2, STATES_PER_PHONE + 2):
                 f.write(f'<STATE> {i}\n<MEAN> 39\n{means}\n')
-                f.write(f'<VARIANCE> 39\n{vars}\n')
+                f.write(f'<VARIANCE> 39\n{variances}\n')
 
             f.write('<TRANSP> 7\n'
                     ' 0.0 1.0 0.0 0.0 0.0 0.0 0.0\n'
@@ -274,7 +283,7 @@ class ForcedAlignment(object):
                     ' 0.0 0.0 0.0 0.0 0.6 0.4 0.0\n'
                     ' 0.0 0.0 0.0 0.0 0.0 0.7 0.3\n'
                     ' 0.0 0.0 0.0 0.0 0.0 0.0 0.0\n'
-                    '<ENDHMM>')
+                    '<ENDHMM>\n')
 
         # Make vFloors
         subprocess.run([self.HCompV,
@@ -326,8 +335,7 @@ class ForcedAlignment(object):
 
             train_scp_chunks = []
 
-            with open(self.train_scp, "rt") as fp:
-                mfc_files = fp.readlines()
+            mfc_files = file_io.load_lines(self.train_scp)
             random.shuffle(mfc_files)
 
             n = (len(mfc_files) + 1) // num_splits
@@ -426,7 +434,6 @@ class ForcedAlignment(object):
         Align using the models in self.cur_dir and MLF to palab_align_dirth
         """
         print('---aligning data')
-
         subprocess.run(
             [self.HVite, '-a', '-f', '-m',
              '-y', 'lab',
@@ -444,10 +451,10 @@ class ForcedAlignment(object):
              self.phonemes],
             check=True)
 
-        print('Checking alignment MLF before running\n'
-              f'\tForcedAlignment()._postprocess({self.align_mlf}, {lab_align_dir}, {lab_dir}, "<file_ids>")')
+        print('--checking alignments')
+        file_ids = self._check_alignments_present(self.align_mlf, file_ids)
 
-        self._check_alignments_present(self.align_mlf, file_ids)
+        print('--saving labels with alignments')
         self._add_alignments_to_lab(self.align_mlf, lab_align_dir, lab_dir, file_ids)
 
     def _check_alignments_present(self, mlf, file_ids, base_name_regex=re.compile(r'"([\w/]+(\.[\w/]+)*)"')):
@@ -457,7 +464,7 @@ class ForcedAlignment(object):
             # Consume the MLF #!header!# line.
             _ = f.readline()
 
-            mlf_ids = []
+            mlf_base_names = []
             while True:
                 line = f.readline().strip()
                 match = re.match(base_name_regex, line)
@@ -466,29 +473,24 @@ class ForcedAlignment(object):
                 if match is not None:
                     label_path = os.path.basename(match.group(1))
                     label_base_name = os.path.splitext(label_path)[0]
-                    mlf_ids.append(label_base_name)
+                    mlf_base_names.append(label_base_name)
 
                 # Reached the end of the file.
                 if len(line) < 1:
                     break
 
-        base_names = set(base_names)
-        mlf_ids = set(mlf_ids)
-
-        err_str = 'Alignment output error'
-
-        missing_from_mlf = base_names.difference(mlf_ids)
+        mlf_base_names = set(mlf_base_names)
+        missing_from_mlf = set(base_names).difference(mlf_base_names)
         if len(missing_from_mlf) > 0:
-            err_str += '\nFollowing files are missing from alignment MLF, it is likely that alignment failed for them\n'
-            err_str += '\n'.join(missing_from_mlf)
+            print('The following files are missing from alignment MLF, it is likely that alignment failed for them')
+            print('\n'.join(missing_from_mlf))
 
-        missing_from_id_list = mlf_ids.difference(base_names)
-        if len(missing_from_id_list) > 0:
-            err_str += '\nFollowing files are missing from id_list, but alignments were generated, use a full id_list\n'
-            err_str += '\n'.join(missing_from_id_list)
+        valiated_file_ids = []
+        for file_id, base_name in zip(file_ids, base_names):
+            if base_name in mlf_base_names:
+                valiated_file_ids.append(file_id)
 
-        if len(missing_from_mlf) > 0 or len(missing_from_id_list) > 0:
-            raise ValueError(err_str)
+        return valiated_file_ids
 
     def _add_alignments_to_lab(self, mlf, lab_align_dir, lab_dir, file_ids):
         make_dirs(lab_align_dir, file_ids)
@@ -532,7 +534,8 @@ class ForcedAlignment(object):
                     raise ValueError('The two files are not matched!')
 
 
-def process(htk_dir, lab_dir, wav_dir, id_list, out_dir, multiple_speaker=False, num_train_proccesses=1):
+def process(htk_dir, lab_dir, wav_dir, id_list, out_dir, multiple_speaker=False, num_train_proccesses=1,
+            prepare_data=True, train_hmm=True, align=True):
     """Create flat HTS-style full-context labels.
 
     Args:
@@ -543,15 +546,24 @@ def process(htk_dir, lab_dir, wav_dir, id_list, out_dir, multiple_speaker=False,
         out_dir (str): Directory to save the output to.
         multiple_speaker (bool): Whether the data contains multiple speakers.
         num_train_proccesses (int): Number of parallel processes to use for HMM training.
+        prepare_data (bool): Prepare for training: make file_id lists, convert labels to mono-lab, extract MFCCs,
+            normalise by speaker, and make the protos.
+        train_hmm (bool): Train the HMM
+        align (bool): Align data using the trained HMM.
     """
     aligner = ForcedAlignment(htk_dir, lab_dir, wav_dir, id_list, out_dir)
 
     # After `ForcedAlignment.check_file_ids` some files may be excluded.
     file_ids = aligner.file_ids
 
-    aligner.prepare_data(multiple_speaker)
-    aligner.train_hmm(7, 32, num_splits=num_train_proccesses)
-    aligner.align(os.path.join(out_dir, 'label_state_align'), lab_dir, file_ids)
+    if prepare_data:
+        aligner.prepare_data(multiple_speaker)
+
+    if train_hmm:
+        aligner.train_hmm(7, 32, num_splits=num_train_proccesses)
+
+    if align:
+        aligner.align(os.path.join(out_dir, 'label_state_align'), lab_dir, file_ids)
 
 
 def main():
@@ -561,7 +573,7 @@ def main():
     args = parser.parse_args()
 
     process(args.htk_dir, args.lab_dir, args.wav_dir, args.id_list, args.out_dir,
-            args.multiple_speaker, args.num_train_proccesses)
+            args.multiple_speaker, args.num_train_proccesses, args.prepare_data, args.train_hmm, args.align)
 
 
 if __name__ == "__main__":
