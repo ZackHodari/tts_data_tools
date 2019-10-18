@@ -29,6 +29,7 @@ setup(
         'resources/festival/label-mono.awk',
     ]},
     entry_points={'console_scripts': [
+        'tdt_lab_gen = tts_data_tools.lab_gen:main',
         'tdt_txt_to_utt = tts_data_tools.lab_gen.txt_to_utt:main',
         'tdt_utt_to_lab = tts_data_tools.lab_gen.utt_to_lab:main',
         'tdt_align_lab = tts_data_tools.lab_gen.align_lab:main',
