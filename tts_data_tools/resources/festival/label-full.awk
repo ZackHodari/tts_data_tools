@@ -186,8 +186,7 @@
     printf "=%s",   $2 == "pau" ? "x" : $42
 
 #  position in major phrase (phrase)
-    printf "@";
-    printf "%s", $44 + 1
+    printf "@%s", $44 + 1
     printf "=%s", $48 - $44
 
 #  type of tobi endtone of current phrase
