@@ -38,6 +38,8 @@ def add_arguments(parser):
                         help="Whether to upsample the numerical labels to frame-level.")
     parser.add_argument("--subphone_feat_type", action="store", dest="subphone_feat_type", type=str, default=None,
                         help="The type of subphone counter features.")
+    parser.add_argument("--trim_silences", action="store_true", dest="trim_silences", default=False,
+                        help="Whether to trim start and end silences from all features.")
     parser.add_argument("--calculate_normalisation", action="store_true", dest="calculate_normalisation", default=False,
                         help="Whether to automatically calculate MVN parameters after extracting F0.")
     parser.add_argument("--normalisation_of_deltas", action="store_true", dest="normalisation_of_deltas", default=False,
@@ -46,7 +48,8 @@ def add_arguments(parser):
 
 
 def process(lab_dir, wav_dir, id_list, out_dir,
-            state_level, question_file, upsample, subphone_feat_type, calculate_normalisation, normalisation_of_deltas):
+            state_level, question_file, upsample, subphone_feat_type,
+            trim_silences, calculate_normalisation, normalisation_of_deltas):
     """Processes wav files in id_list, saves the log-F0 and MVN parameters to files.
 
     Args:
@@ -64,6 +67,7 @@ def process(lab_dir, wav_dir, id_list, out_dir,
                 questions-japanese.hed
         upsample (bool): Whether to upsample phone-level numerical labels to frame-level.
         subphone_feat_type (str): Subphone features to be extracted from the durations.
+        trim_silences (bool): Whether to trim start and end silences from all features.
         calculate_normalisation (bool): Whether to automatically calculate MVN parameters after extracting F0.
         normalisation_of_deltas (bool): Also calculate the MVN parameters for the delta and delta delta features.
     """
@@ -122,11 +126,33 @@ def process(lab_dir, wav_dir, id_list, out_dir,
 
         assert n_frames == np.sum(durations).item()
 
-        counter_features = counter_features[:n_frames]
-        lf0 = lf0[:n_frames]
-        vuv = vuv[:n_frames]
-        sp = sp[:n_frames]
-        ap = ap[:n_frames]
+        trim_frame_slice = slice(0, n_frames)
+        if trim_silences:
+
+            start_phone_idx, end_phone_idx = 0, n_phones
+            start_frame_idx, end_frame_idx = 0, n_frames
+            if phones[0] == 'sil':
+                start_phone_idx += 1
+                start_frame_idx += durations[0]
+            if phones[-1] == 'sil':
+                end_phone_idx -= 1
+                end_frame_idx -= durations[-1]
+
+            trim_phone_slice = slice(int(start_phone_idx), int(end_phone_idx))
+            trim_frame_slice = slice(int(start_frame_idx), int(end_frame_idx))
+
+            numerical_labels = numerical_labels[trim_frame_slice if upsample else trim_phone_slice]
+            durations = durations[trim_phone_slice]
+            phones = phones[trim_phone_slice]
+
+            n_frames = trim_frame_slice.stop - trim_frame_slice.start
+            n_phones = trim_phone_slice.stop - trim_phone_slice.start
+
+        counter_features = counter_features[trim_frame_slice]
+        lf0 = lf0[trim_frame_slice]
+        vuv = vuv[trim_frame_slice]
+        sp = sp[trim_frame_slice]
+        ap = ap[trim_frame_slice]
 
         file_io.save_bin(numerical_labels, os.path.join(out_dir, 'lab', file_id))
         file_io.save_bin(counter_features, os.path.join(out_dir, 'counters', file_id))
@@ -159,7 +185,7 @@ def main():
 
     process(args.lab_dir, args.wav_dir, args.id_list, args.out_dir,
             args.state_level, args.question_file, args.upsample_to_frame_level, args.subphone_feat_type,
-            args.calculate_normalisation, args.normalisation_of_deltas)
+            args.trim_silences, args.calculate_normalisation, args.normalisation_of_deltas)
 
 
 if __name__ == "__main__":
