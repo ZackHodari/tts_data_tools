@@ -30,15 +30,15 @@ def add_arguments(parser):
     parser.add_argument("--out_dir", action="store", dest="out_dir", type=str, required=True,
                         help="Directory to save the output to.")
     parser.add_argument("--custom_voice", action="store", dest="custom_voice", type=str, default=False,
-                        help="Name of Festival voice to use when generating Utterance structures..")
+                        help="Name of Festival voice to use when generating Utterance structures.")
 
 
 def create_utterances(festival_dir, file_ids, sentences, out_dir, custom_voice=None):
-    scm_commands = []
+    scm_commands = [f'#!{festival_dir}/bin/festival']
 
     if custom_voice is not None:
         # Run Festival with a particular voice.
-        scm_commands.append(f'({custom_voice})')
+        scm_commands.append(f'(voice_{custom_voice})')
 
     scm_command_str = '(utt.save (utt.synth (Utterance Text "{sentence}" )) "{utt_file}")'
 

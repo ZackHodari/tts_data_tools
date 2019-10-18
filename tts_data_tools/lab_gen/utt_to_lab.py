@@ -14,6 +14,7 @@ import os
 import pkg_resources
 import re
 import subprocess
+import tempfile
 
 import numpy as np
 
@@ -40,15 +41,32 @@ def add_arguments(parser):
                         help="Directory to save the output to.")
     parser.add_argument("--label_mono_awk", action="store", dest="label_mono_awk", type=str, default='label-mono.awk',
                         help="Directory to save the output to.")
+    parser.add_argument("--custom_voice", action="store", dest="custom_voice", type=str, default=False,
+                        help="Name of Festival voice to use when generating Utterance structures.")
 
 
 def utts_to_dumps(dumpfeats_exe, utt_dir, file_ids, dump_dir,
-                  extra_feats_scm='extra_feats.scm', label_feats='label.feats'):
+                  extra_feats_scm='extra_feats.scm', label_feats='label.feats', custom_voice=None):
 
     if extra_feats_scm in pkg_resources.resource_listdir('tts_data_tools', os.path.join('resources', 'festival')):
         print(f'Using tts_data_tools resource from resources/festival for {extra_feats_scm}')
         extra_feats_scm = pkg_resources.resource_filename('tts_data_tools',
                                                           os.path.join('resources', 'festival', extra_feats_scm))
+
+    if custom_voice is not None:
+        # Create a temporary file, to which we can add a command to load the custom voice.
+        extra_feats_scm_with_custom_voice = tempfile.NamedTemporaryFile(suffix='.scm')
+
+        # Write an initial line to load the custom voice.
+        extra_feats_scm_with_custom_voice.write(f'(voice_{custom_voice})\n')
+
+        # Write the code from the original Scheme file.
+        with open(extra_feats_scm, 'r') as f:
+            scm_code = f.read()
+        extra_feats_scm_with_custom_voice.write(scm_code)
+
+        # Replace the file name with the name of the temporary file.
+        extra_feats_scm = extra_feats_scm_with_custom_voice.name
 
     if label_feats in pkg_resources.resource_listdir('tts_data_tools', os.path.join('resources', 'festival')):
         print(f'Using tts_data_tools resource from resources/festival for {label_feats}')
@@ -65,6 +83,10 @@ def utts_to_dumps(dumpfeats_exe, utt_dir, file_ids, dump_dir,
                         '-feats', label_feats,
                         '-output', os.path.join(dump_dir, f'{file_id}.txt'),
                         os.path.join(utt_dir, f'{file_id}.utt')], check=True)
+
+    if custom_voice is not None:
+        # Make sure to close the temporary file, this ensures it gets deleted.
+        extra_feats_scm_with_custom_voice.close()
 
 
 def dumps_to_labs(dump_dir, file_ids, label_out_dir, awk='label-full.awk'):
@@ -165,7 +187,7 @@ def sanitise_labs(lab_dir, file_ids, label_out_dir, include_times=False, state_l
 
 def process(festival_dir, utt_dir, id_list, out_dir,
             extra_feats_scm='extra_feats.scm', label_feats='label.feats',
-            label_full_awk='label-full.awk', label_mono_awk='label-mono.awk'):
+            label_full_awk='label-full.awk', label_mono_awk='label-mono.awk', custom_voice=None):
     """Create flat HTS-style full-context labels.
 
     Args:
@@ -189,7 +211,7 @@ def process(festival_dir, utt_dir, id_list, out_dir,
     mono_no_align_dir = os.path.join(out_dir, 'mono_no_align')
 
     # Create the flattened features and format them according to `label_full_awk` and `label_mono_awk`.
-    utts_to_dumps(dumpfeats_exe, utt_dir, file_ids, label_dump_dir, extra_feats_scm, label_feats)
+    utts_to_dumps(dumpfeats_exe, utt_dir, file_ids, label_dump_dir, extra_feats_scm, label_feats, custom_voice)
     dumps_to_labs(label_dump_dir, file_ids, label_full_dir, label_full_awk)
     dumps_to_labs(label_dump_dir, file_ids, label_mono_dir, label_mono_awk)
 
@@ -205,7 +227,7 @@ def main():
     args = parser.parse_args()
 
     process(args.festival_dir, args.utt_dir, args.id_list, args.out_dir,
-            args.extra_feats_scm, args.label_feats, args.label_full_awk, args.label_mono_awk)
+            args.extra_feats_scm, args.label_feats, args.label_full_awk, args.label_mono_awk, args.custom_voice)
 
 
 if __name__ == "__main__":
