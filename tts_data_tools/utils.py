@@ -1,8 +1,15 @@
 """Utility functions for various tools."""
 
+import argparse
 import os
 
 import numpy as np
+
+
+def add_boolean_arg(parser, name, help):
+    r"""Adds two arguments (one with a \"no-" prefix), allowing for a positive or a negative boolean argument."""
+    parser.add_argument("--{}".format(name), dest=name, action="store_true", default=True, help=help)
+    parser.add_argument("--no-{}".format(name), dest=name, action="store_false", help=argparse.SUPPRESS)
 
 
 def listify(object_or_list):
