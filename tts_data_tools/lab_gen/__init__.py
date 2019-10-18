@@ -8,6 +8,14 @@ def add_arguments(parser):
 
 
 def main():
+    import sys
+
+    from tts_data_tools.lab_gen import (
+        txt_to_utt,
+        utt_to_lab,
+        align_lab,
+        lab_to_feat)
+
     all_args = list(sys.argv[1:])
 
     # Text to Utterance structures.
@@ -47,13 +55,5 @@ def main():
 
 
 if __name__ == "__main__":
-    import sys
-
-    from tts_data_tools.lab_gen import (
-        txt_to_utt,
-        utt_to_lab,
-        align_lab,
-        lab_to_feat)
-
     main()
 
