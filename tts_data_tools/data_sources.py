@@ -295,11 +295,14 @@ class NumpyBinarySource(_DataSource):
         The file extension of the saved features, if not set `name` is used.
     dtype : np.dtype, optional
         If given, convert the data to this dtype when saving/loading.
+    sentence_level : bool, optional
+        If True, try and convert the loaded data to a scalar.
     """
-    def __init__(self, name, use_deltas=False, ext='npy', dtype=None):
+    def __init__(self, name, use_deltas=False, ext='npy', dtype=None, sentence_level=False):
         super(NumpyBinarySource, self).__init__(name, use_deltas, ext)
 
         self.dtype = dtype
+        self.sentence_level = sentence_level
 
     def load_file(self, base_name, data_dir):
         r"""Loads the feature using `np.load`.
@@ -340,6 +343,10 @@ class NumpyBinarySource(_DataSource):
         if self.dtype is not None:
             data = data.astype(self.dtype)
 
+        # If the sequence length feature is describing a sentence level length, convert it to a scalar.
+        if data.shape[0] == 1 and self.sentence_level:
+            data = data.item()
+
         file_io.save_bin(data, file_path)
 
 
@@ -354,9 +361,13 @@ class TextSource(_DataSource):
         Whether to compute delta features.
     ext : str, optional
         The file extension of the saved features, if not set `name` is used.
+    sentence_level : bool, optional
+        If True, try and convert the loaded data to a scalar.
     """
-    def __init__(self, name, use_deltas=False, ext='txt'):
+    def __init__(self, name, use_deltas=False, ext='txt', sentence_level=False):
         super(TextSource, self).__init__(name, use_deltas, ext)
+
+        self.sentence_level = sentence_level
 
     def load_file(self, base_name, data_dir):
         r"""Loads the feature from a text file into a numpy array.
@@ -373,13 +384,13 @@ class TextSource(_DataSource):
         int or float or np.ndarray, shape (seq_len, feat_dim)
         """
         file_path = self.file_path(base_name, data_dir)
-        feature = file_io.load_txt(file_path)
+        data = file_io.load_txt(file_path)
 
         # If the sequence length feature is describing a sentence level length, convert it to a scalar.
-        if feature.shape[0] == 1:
-            feature = feature.item()
+        if data.shape[0] == 1 and self.sentence_level:
+            data = data.item()
 
-        return feature
+        return data
 
     def save_file(self, data, base_name, data_dir):
         r"""Saves data as a text file.
