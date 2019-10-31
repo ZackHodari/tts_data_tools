@@ -8,8 +8,6 @@ from tts_data_tools.wav_gen import world, reaper_f0, utils
 
 from tts_data_tools.scripts.mean_variance_normalisation import process as process_mvn
 
-WORLD_UNVOICED_VALUE = 0.
-
 
 def add_arguments(parser):
     parser.add_argument("--wav_dir", action="store", dest="wav_dir", type=str, required=True,

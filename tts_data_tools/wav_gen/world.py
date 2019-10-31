@@ -10,7 +10,7 @@ from tts_data_tools.scripts.mean_variance_normalisation import process as proces
 
 import pyworld
 
-WORLD_UNVOICED_VALUE = 0.
+UNVOICED_VALUE = 0.
 
 
 def add_arguments(parser):
@@ -27,7 +27,7 @@ def add_arguments(parser):
 
 
 def extract_vuv(f0):
-    return utils.extract_vuv(f0, WORLD_UNVOICED_VALUE)
+    return utils.extract_vuv(f0, UNVOICED_VALUE)
 
 
 def basic_analysis(wav, sample_rate):
