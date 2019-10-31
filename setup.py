@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='tts_data_tools',
-    version='0.4',
+    version='0.5',
     description='Data processing tools for preparing speech and labels for training TTS voices.',
     url='https://github.com/ZackHodari/tts_data_tools',
     author='Zack Hodari',
