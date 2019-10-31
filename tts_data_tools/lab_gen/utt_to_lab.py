@@ -10,6 +10,8 @@ Usage:
 """
 
 import argparse
+import glob
+import itertools
 import os
 import pkg_resources
 import re
@@ -23,6 +25,8 @@ from tts_data_tools import utils
 
 STATES_PER_PHONE = 5
 
+FESTIVAL_LEVELS = ('Token', 'Word', 'Phrase', 'SylStructure', 'Syllable', 'Segment')
+
 
 def add_arguments(parser):
     parser.add_argument("--festival_dir", action="store", dest="festival_dir", type=str, required=True,
@@ -33,6 +37,9 @@ def add_arguments(parser):
                         help="List of file basenames to process (must be provided if txt_dir is used).")
     parser.add_argument("--out_dir", action="store", dest="out_dir", type=str, required=True,
                         help="Directory to save the output to.")
+    parser.add_argument("--feature_level", action="store", dest="feature_level", type=str, default='Segment',
+                        help="The linguistic level at which to dump features from the Utterance structure, one of: "
+                             "Phrase, Token, Word, SylStructure, Syllable, Segment.")
     parser.add_argument("--extra_feats_scm", action="store", dest="extra_feats_scm", type=str, default='extra_feats.scm',
                         help="Directory to save the output to.")
     parser.add_argument("--label_feats", action="store", dest="label_feats", type=str, default='label.feats',
@@ -45,7 +52,7 @@ def add_arguments(parser):
                         help="Name of Festival voice to use when generating Utterance structures.")
 
 
-def utts_to_dumps(dumpfeats_exe, utt_dir, file_ids, dump_dir,
+def utts_to_dumps(dumpfeats_exe, utt_dir, file_ids, dump_dir, feature_level='Segment',
                   extra_feats_scm='extra_feats.scm', label_feats='label.feats', custom_voice=None):
 
     if extra_feats_scm in pkg_resources.resource_listdir('tts_data_tools', os.path.join('resources', 'festival')):
@@ -79,10 +86,15 @@ def utts_to_dumps(dumpfeats_exe, utt_dir, file_ids, dump_dir,
         # Argument `check=True` ensures that an exception is raised if the process' return code is non-zero.
         subprocess.run([dumpfeats_exe,
                         '-eval', extra_feats_scm,
-                        '-relation', 'Segment',
+                        '-relation', feature_level,
                         '-feats', label_feats,
                         '-output', os.path.join(dump_dir, f'{file_id}.txt'),
                         os.path.join(utt_dir, f'{file_id}.utt')], check=True)
+
+    # Replace any '#' characters used for pauses with 'pau'.
+    subprocess.run(['sed', '-i',
+                    '-e', 's/#/pau/g',
+                    *glob.glob('label_POS/label_phone_align/dump/*')], check=True)
 
     if custom_voice is not None:
         # Make sure to close the temporary file, this ensures it gets deleted.
@@ -177,15 +189,15 @@ def sanitise_labs(lab_dir, file_ids, label_out_dir, include_times=False, state_l
                 label[i] += f'[{state_idx+2}]'
 
         if include_times:
-            start_times = list(map(round_dur, start_times))
-            end_times = list(map(round_dur, end_times))
+            start_times = list(map(_round_dur, start_times))
+            end_times = list(map(_round_dur, end_times))
 
             label = list(map(' '.join, zip(*[start_times, end_times, label])))
 
         file_io.save_lines(label, os.path.join(label_out_dir, f'{file_id}.lab'))
 
 
-def process(festival_dir, utt_dir, id_list, out_dir,
+def process(festival_dir, utt_dir, id_list, out_dir, feature_level='Segment',
             extra_feats_scm='extra_feats.scm', label_feats='label.feats',
             label_full_awk='label-full.awk', label_mono_awk='label-mono.awk', custom_voice=None):
     """Create flat HTS-style full-context labels.
@@ -211,7 +223,8 @@ def process(festival_dir, utt_dir, id_list, out_dir,
     mono_no_align_dir = os.path.join(out_dir, 'mono_no_align')
 
     # Create the flattened features and format them according to `label_full_awk` and `label_mono_awk`.
-    utts_to_dumps(dumpfeats_exe, utt_dir, file_ids, label_dump_dir, extra_feats_scm, label_feats, custom_voice)
+    utts_to_dumps(dumpfeats_exe, utt_dir, file_ids, label_dump_dir, feature_level,
+                  extra_feats_scm, label_feats, custom_voice)
     dumps_to_labs(label_dump_dir, file_ids, label_full_dir, label_full_awk)
     dumps_to_labs(label_dump_dir, file_ids, label_mono_dir, label_mono_awk)
 
@@ -226,7 +239,7 @@ def main():
     add_arguments(parser)
     args = parser.parse_args()
 
-    process(args.festival_dir, args.utt_dir, args.id_list, args.out_dir,
+    process(args.festival_dir, args.utt_dir, args.id_list, args.out_dir, args.feature_level,
             args.extra_feats_scm, args.label_feats, args.label_full_awk, args.label_mono_awk, args.custom_voice)
 
 
