@@ -119,11 +119,22 @@ def dumps_to_labs(dump_dir, file_ids, label_out_dir, awk='label-full.awk'):
             f.write(rtn.stdout)
 
 
-def mark_silences(label, current_phone_regex=re.compile('-(.+?)\+'), n_gram_size=2, is_mono=False):
-    phones = []
-    is_silence = []
+def _mark_silence(line, is_mono=False, n_gram_sep='/A'):
+    if is_mono:
+        return line.replace('pau', 'sil').replace('#', 'sil')
 
-    for line in label:
+    else:
+        n_gram = line[:line.index(n_gram_sep)]
+        remaining_label = line[line.index(n_gram_sep):]
+
+        return n_gram.replace('pau', 'sil').replace('#', 'sil') + remaining_label
+
+
+def sanitise_silences(start_times, end_times, label, current_phone_regex=re.compile('-(.+?)\+'), n_gram_size=2, is_mono=False):
+    phones = []
+    is_silences = []
+
+    for start_time, end_time, line in zip(start_times, end_times, label):
         if is_mono:
             phone = line
 
@@ -136,28 +147,42 @@ def mark_silences(label, current_phone_regex=re.compile('-(.+?)\+'), n_gram_size
             phone = match.group(1)
 
         phones.append(phone)
-        is_silence.append(phone in ['pau', 'sil'])
+        is_silences.append(phone in ['pau', 'sil', '#'])
 
-    first_phone_idx = is_silence.index(False)
-    last_phone_idx = len(is_silence) - 1 - is_silence[::-1].index(False)
+    first_phone_idx = is_silences.index(False)
+    last_phone_idx = len(is_silences) - 1 - is_silences[::-1].index(False)
 
-    # Replace the pauses before and after the phone sequence with silences.
-    for i, line in enumerate(label):
-        if is_mono:
-            if i < first_phone_idx + n_gram_size or i > last_phone_idx - n_gram_size:
-                label[i] = line.replace('pau', 'sil')
+    new_start_times, new_end_times, new_label = [], [], []
+    # Remove contiguous pauses and replace the pauses before and after the phone sequence with silences.
+    for is_silence, enumerated in itertools.groupby(enumerate(is_silences), key=lambda x: x[1]):
 
+        # Only add silences once (remove repeats and merge start/end times).
+        if is_silence:
+            # Get the first and last index in the group.
+            start_i = next(enumerated)[0]
+            end_i = start_i
+            for end_i, _ in enumerated:
+                pass
+
+            new_start_times.append(start_times[start_i])
+            new_end_times.append(end_times[end_i])
+
+            if end_i < first_phone_idx + n_gram_size or start_i > last_phone_idx - n_gram_size:
+                new_label.append(_mark_silence(label[start_i], is_mono=is_mono))
+            else:
+                new_label.append(label[start_i])
+
+        # Add all phones that are not silences.
         else:
-            n_gram = line[:line.index('/A')]
-            remaining_label = line[line.index('/A'):]
+            for i, _ in enumerated:
+                new_start_times.append(start_times[i])
+                new_end_times.append(end_times[i])
+                new_label.append(_mark_silence(label[i], is_mono=is_mono))
 
-            if i < first_phone_idx + n_gram_size or i > last_phone_idx - n_gram_size:
-                label[i] = n_gram.replace('pau', 'sil') + remaining_label
-
-    return label
+    return new_start_times, new_end_times, new_label
 
 
-def round_dur(dur):
+def _round_dur(dur):
     return int(round(dur / 50000, 0) * 50000)
 
 
@@ -170,7 +195,7 @@ def sanitise_labs(lab_dir, file_ids, label_out_dir, include_times=False, state_l
         n_phones = len(label)
 
         start_times, end_times, label = map(list, zip(*map(str.split, label)))
-        label = mark_silences(label, is_mono=is_mono)
+        start_times, end_times, label = sanitise_silences(start_times, end_times, label, is_mono=is_mono)
 
         if state_level:
             if include_times:
