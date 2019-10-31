@@ -1,9 +1,65 @@
 import numpy as np
 from scipy.signal import convolve2d
 
+FRAME_LENGTH = {
+    8000: 512,
+    10000: 512,
+    16000: 1024,
+    22050: 1024,
+    24000: 1024,
+    44100: 2048,
+    48000: 2048,
+}
+
+r"""
+Alpha is used to approximate the effect of the mel-scale filter bank, the choice of alpha is dependent on the sampling
+rate. The following code can be used to manually determine a good value of alpha.
+
+See https://www.sp.nitech.ac.jp/~tokuda/tokuda_tamkang2002.pdf for more details.
+
+```
+def plot_warping_alpha_or_mel(alpha, sample_rate, frame_length=1024):
+    nfft_half = frame_length // 2 + 1
+
+    hz = np.linspace(0, sample_rate / 2., nfft_half)
+    mel = 1127. * np.log(1. + (hz / 700.))
+    mel = mel / mel.max() * np.pi
+
+    omega = np.linspace(0, np.pi, nfft_half)
+    H = (np.exp(-1j * omega) - alpha) / (1 - alpha * np.exp(-1j * omega))
+    warped_omega = -np.arctan2(np.imag(H), np.real(H))
+
+    plt.figure(figsize=(6, 6))
+    plt.plot(omega, mel, label=f'mel (sr={sample_rate})')
+    plt.plot(omega, warped_omega, label=f'alpha={alpha}')
+    plt.legend(loc='lower right')
+    plt.xticks([0, np.pi/2., np.pi], [r'$0$', r'$\frac{\pi}{2}$', r'$\pi$'])
+    plt.yticks([0, np.pi/2., np.pi], [r'$0$', r'$\frac{\pi}{2}$', r'$\pi$'])
+    plt.show()
+
+plot_warping_alpha_or_mel(0.36, 8000)
+plot_warping_alpha_or_mel(0.39, 10000)
+plot_warping_alpha_or_mel(0.46, 16000)
+plot_warping_alpha_or_mel(0.50, 22050)
+plot_warping_alpha_or_mel(0.51, 24000)
+plot_warping_alpha_or_mel(0.58, 44100)
+plot_warping_alpha_or_mel(0.60, 48000)
+```
+"""
+
+ALPHA = {
+    8000: 0.36,
+    10000: 0.39,
+    16000: 0.46,
+    22050: 0.50,
+    24000: 0.51,
+    44100: 0.58,
+    48000: 0.60,
+}
+
 
 def compute_running_window(feature, window):
-    """Computing dynamic features using a window is exactly a convolution operation."""
+    r"""Computing dynamic features using a window is exactly a convolution operation."""
     # Check that the window length is odd.
     assert len(window) % 2 == 1
 
@@ -35,7 +91,7 @@ def extract_vuv(signal, unvoiced_value):
 
 
 def interpolate(signal, is_voiced):
-    """Linearly interpolates the signal in unvoiced regions such that there are no discontinuities.
+    r"""Linearly interpolates the signal in unvoiced regions such that there are no discontinuities.
 
     Args:
         signal (np.ndarray[n_frames, feat_dim]): Temporal signal.
