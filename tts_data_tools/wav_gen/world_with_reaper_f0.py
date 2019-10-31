@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 from tts_data_tools import file_io
-from tts_data_tools.utils import get_file_ids
+from tts_data_tools.utils import get_file_ids, make_dirs
 from tts_data_tools.wav_gen import world, reaper_f0, utils
 
 from tts_data_tools.scripts.mean_variance_normalisation import process as process_mvn
@@ -45,7 +45,7 @@ def basic_analysis(wav, sample_rate):
     return f0, sp, ap
 
 
-def analysis(wav, sample_rate):
+def analysis(wav, sample_rate, mcep_dims=60, bap_dims=5):
     """Extracts REAPER's f0 and WORLDS segmental features. Ensures they are the same number of frames.
 
     Note VUV in F0 is represented using -1.0
@@ -53,19 +53,22 @@ def analysis(wav, sample_rate):
     Returns:
         (np.ndarray[n_frames, 1]): interpolated fundamental frequency,
         (np.ndarray[n_frames, 1]): voiced-unvoiced flags,
-        (np.ndarray[n_frames, sp_dim]): smoothed spectrogram,
-        (np.ndarray[n_frames, ap_dim]): aperiodicity.
+        (np.ndarray[n_frames, sp_dim]): mel cepstrum,
+        (np.ndarray[n_frames, ap_dim]): band aperiodicity.
     """
-    f0, sp, ap = basic_analysis(wav, sample_rate)
+    f0, smoothed_spectrogram, aperiodicity = basic_analysis(wav, sample_rate)
 
     vuv = extract_vuv(f0)
     f0_interpolated = utils.interpolate(f0, vuv)
 
-    return f0_interpolated, vuv, sp, ap
+    mel_cepstrum = world.freq_to_mcep(smoothed_spectrogram, sample_rate, dims=mcep_dims)
+    band_aperiodicity = world.freq_to_mcep(aperiodicity, sample_rate, dims=bap_dims)
+
+    return f0_interpolated, vuv, mel_cepstrum, band_aperiodicity
 
 
-def synthesis(f0, vuv, sp, ap, sample_rate):
-    return world.synthesis(f0, vuv, sp, ap, sample_rate)
+def synthesis(f0, vuv, mcep, bap, sample_rate):
+    return world.synthesis(f0, vuv, mcep, bap, sample_rate)
 
 
 def process(wav_dir, id_list, out_dir, calculate_normalisation, normalisation_of_deltas):
@@ -78,24 +81,33 @@ def process(wav_dir, id_list, out_dir, calculate_normalisation, normalisation_of
         calculate_normalisation (bool): Whether to automatically calculate MVN parameters after extracting F0.
         normalisation_of_deltas (bool): Also calculate the MVN parameters for the delta and delta delta features.
     """
-    file_ids = get_file_ids(wav_dir, id_list)
+    file_ids = get_file_ids(id_list=id_list)
+
+    make_dirs(os.path.join(out_dir, 'lf0'), file_ids)
+    make_dirs(os.path.join(out_dir, 'vuv'), file_ids)
+    make_dirs(os.path.join(out_dir, 'mcep'), file_ids)
+    make_dirs(os.path.join(out_dir, 'bap'), file_ids)
+    make_dirs(os.path.join(out_dir, 'wav_synth'), file_ids)
 
     for file_id in file_ids:
         wav_path = os.path.join(wav_dir, '{}.wav'.format(file_id))
         wav, sample_rate = file_io.load_wav(wav_path)
 
-        f0, vuv, sp, ap = analysis(wav, sample_rate)
+        f0, vuv, mcep, bap = analysis(wav, sample_rate)
         lf0 = np.log(f0)
 
-        file_io.save_bin(lf0, os.path.join(out_dir, 'lf0', '{}.lf0'.format(file_id)))
-        file_io.save_bin(vuv, os.path.join(out_dir, 'vuv', '{}.vuv'.format(file_id)))
-        file_io.save_bin(sp, os.path.join(out_dir, 'sp', '{}.sp'.format(file_id)))
-        file_io.save_bin(ap, os.path.join(out_dir, 'ap', '{}.ap'.format(file_id)))
+        wav_synth = synthesis(f0, vuv, mcep, bap, sample_rate)
+
+        file_io.save_bin(lf0, os.path.join(out_dir, 'lf0', file_id))
+        file_io.save_bin(vuv, os.path.join(out_dir, 'vuv', file_id))
+        file_io.save_bin(mcep, os.path.join(out_dir, 'mcep', file_id))
+        file_io.save_bin(bap, os.path.join(out_dir, 'bap', file_id))
+        file_io.save_wav(wav_synth, os.path.join(out_dir, 'wav_synth', f'{file_id}.wav'), sample_rate)
 
     if calculate_normalisation:
-        process_mvn(out_dir, 'lf0', id_list=id_list, deltas=normalisation_of_deltas)
-        process_mvn(out_dir, 'sp', id_list=id_list, deltas=normalisation_of_deltas)
-        process_mvn(out_dir, 'ap', id_list=id_list, deltas=normalisation_of_deltas)
+        process_mvn(out_dir, 'lf0', id_list=id_list, deltas=normalisation_of_deltas, out_dir=out_dir)
+        process_mvn(out_dir, 'mcep', id_list=id_list, deltas=normalisation_of_deltas, out_dir=out_dir)
+        process_mvn(out_dir, 'bap', id_list=id_list, deltas=normalisation_of_deltas, out_dir=out_dir)
 
 
 def main():
