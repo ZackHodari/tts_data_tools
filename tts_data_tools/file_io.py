@@ -8,8 +8,8 @@ Usage:
 
 import json
 import os
-from scipy.io import wavfile
 
+from scipy.io import wavfile
 import numpy as np
 
 from tts_data_tools import utils
