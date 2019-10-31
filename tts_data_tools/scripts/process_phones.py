@@ -37,6 +37,9 @@ def process(lab_dir, id_list, out_dir, state_level):
     """
     file_ids = utils.get_file_ids(id_list=id_list)
 
+    utils.make_dirs(os.path.join(out_dir, 'phones'), file_ids)
+    utils.make_dirs(os.path.join(out_dir, 'n_phones'), file_ids)
+
     for file_id in file_ids:
         # Label processing.
         lab_path = os.path.join(lab_dir, '{}.lab'.format(file_id))
