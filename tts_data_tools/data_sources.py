@@ -293,9 +293,13 @@ class NumpyBinarySource(_DataSource):
         Whether to compute delta features.
     ext : str, optional
         The file extension of the saved features, if not set `name` is used.
+    dtype : np.dtype, optional
+        If given, convert the data to this dtype when saving/loading.
     """
-    def __init__(self, name, use_deltas=False, ext='npy'):
+    def __init__(self, name, use_deltas=False, ext='npy', dtype=None):
         super(NumpyBinarySource, self).__init__(name, use_deltas, ext)
+
+        self.dtype = dtype
 
     def load_file(self, base_name, data_dir):
         r"""Loads the feature using `np.load`.
@@ -312,7 +316,12 @@ class NumpyBinarySource(_DataSource):
         int or float or bool or np.ndarray, shape (seq_len, feat_dim)
         """
         file_path = self.file_path(base_name, data_dir)
-        return file_io.load_bin(file_path)
+        data = file_io.load_bin(file_path)
+
+        if self.dtype is not None:
+            data = data.astype(self.dtype)
+
+        return data
 
     def save_file(self, data, base_name, data_dir):
         r"""Saves the feature using `np.save`.
@@ -327,6 +336,10 @@ class NumpyBinarySource(_DataSource):
             The directory containing all feature types for this dataset.
         """
         file_path = self.file_path(base_name, data_dir)
+
+        if self.dtype is not None:
+            data = data.astype(self.dtype)
+
         file_io.save_bin(data, file_path)
 
 
