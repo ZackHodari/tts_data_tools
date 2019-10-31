@@ -11,9 +11,10 @@ setup(
     # license='MIT',
     install_requires=[
         'numpy',
-        'scipy',
-        'pyworld',
         'pyreaper',
+        'pysptk',
+        'pyworld',
+        'scipy',
         'tqdm'
     ],
     packages=['tts_data_tools'],

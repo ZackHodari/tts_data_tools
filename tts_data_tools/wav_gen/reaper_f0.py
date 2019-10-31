@@ -10,7 +10,7 @@ from tts_data_tools.scripts.mean_variance_normalisation import process as proces
 
 import pyreaper
 
-REAPER_UNVOICED_VALUE = -1.
+UNVOICED_VALUE = -1.
 
 
 def add_arguments(parser):
@@ -27,7 +27,7 @@ def add_arguments(parser):
 
 
 def extract_vuv(f0):
-    return utils.extract_vuv(f0, REAPER_UNVOICED_VALUE)
+    return utils.extract_vuv(f0, UNVOICED_VALUE)
 
 
 def basic_analysis(wav, sample_rate):

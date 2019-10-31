@@ -84,8 +84,8 @@ def process(lab_dir, wav_dir, id_list, out_dir,
     utils.make_dirs(os.path.join(out_dir, 'n_phones'), file_ids)
     utils.make_dirs(os.path.join(out_dir, 'lf0'), file_ids)
     utils.make_dirs(os.path.join(out_dir, 'vuv'), file_ids)
-    utils.make_dirs(os.path.join(out_dir, 'sp'), file_ids)
-    utils.make_dirs(os.path.join(out_dir, 'ap'), file_ids)
+    utils.make_dirs(os.path.join(out_dir, 'mcep'), file_ids)
+    utils.make_dirs(os.path.join(out_dir, 'bap'), file_ids)
 
     for file_id in tqdm(file_ids):
         # Label processing.
@@ -104,7 +104,7 @@ def process(lab_dir, wav_dir, id_list, out_dir,
         wav_path = os.path.join(wav_dir, '{}.wav'.format(file_id))
         wav, sample_rate = file_io.load_wav(wav_path)
 
-        f0, vuv, sp, ap = world_with_reaper_f0.analysis(wav, sample_rate)
+        f0, vuv, mcep, bap = world_with_reaper_f0.analysis(wav, sample_rate)
         lf0 = np.log(f0)
 
         # Match the number of frames between label forced-alignment and vocoder analysis.
@@ -122,7 +122,7 @@ def process(lab_dir, wav_dir, id_list, out_dir,
             # Remove 1 frame from each phone's duration starting at the end of the sequence.
             durations[-diff:] -= 1
             n_frames = f0.shape[0]
-            print("Cropped {} frames from durations and  for utterance {}".format(diff, file_id))
+            print("Cropped {} frames from durations for utterance {}".format(diff, file_id))
 
         assert n_frames == np.sum(durations).item()
 
@@ -131,10 +131,10 @@ def process(lab_dir, wav_dir, id_list, out_dir,
 
             start_phone_idx, end_phone_idx = 0, n_phones
             start_frame_idx, end_frame_idx = 0, n_frames
-            if phones[0] == 'sil':
+            if phones[0] in ['sil', '#']:
                 start_phone_idx += 1
                 start_frame_idx += durations[0]
-            if phones[-1] == 'sil':
+            if phones[-1] in ['sil', '#']:
                 end_phone_idx -= 1
                 end_frame_idx -= durations[-1]
 
@@ -151,21 +151,21 @@ def process(lab_dir, wav_dir, id_list, out_dir,
         counter_features = counter_features[trim_frame_slice]
         lf0 = lf0[trim_frame_slice]
         vuv = vuv[trim_frame_slice]
-        sp = sp[trim_frame_slice]
-        ap = ap[trim_frame_slice]
+        mcep = mcep[trim_frame_slice]
+        bap = bap[trim_frame_slice]
 
-        file_io.save_bin(numerical_labels, os.path.join(out_dir, 'lab', file_id))
-        file_io.save_bin(counter_features, os.path.join(out_dir, 'counters', file_id))
+        file_io.save_bin(numerical_labels.astype(np.float32), os.path.join(out_dir, 'lab', file_id))
+        file_io.save_bin(counter_features.astype(np.float32), os.path.join(out_dir, 'counters', file_id))
         file_io.save_txt(durations, os.path.join(out_dir, 'dur', '{}.txt'.format(file_id)))
         file_io.save_lines(phones, os.path.join(out_dir, 'phones', '{}.txt'.format(file_id)))
 
         file_io.save_txt(n_frames, os.path.join(out_dir, 'n_frames', '{}.txt'.format(file_id)))
         file_io.save_txt(n_phones, os.path.join(out_dir, 'n_phones', '{}.txt'.format(file_id)))
 
-        file_io.save_bin(lf0, os.path.join(out_dir, 'lf0', file_id))
+        file_io.save_bin(lf0.astype(np.float32), os.path.join(out_dir, 'lf0', file_id))
         file_io.save_bin(vuv, os.path.join(out_dir, 'vuv', file_id))
-        file_io.save_bin(sp, os.path.join(out_dir, 'sp', file_id))
-        file_io.save_bin(ap, os.path.join(out_dir, 'ap', file_id))
+        file_io.save_bin(mcep.astype(np.float32), os.path.join(out_dir, 'mcep', file_id))
+        file_io.save_bin(bap.astype(np.float32), os.path.join(out_dir, 'bap', file_id))
 
     if calculate_normalisation:
         process_minmax(out_dir, 'lab', id_list, out_dir=out_dir)
@@ -173,8 +173,8 @@ def process(lab_dir, wav_dir, id_list, out_dir,
         process_mvn(out_dir, 'dur', is_npy=False, id_list=id_list, deltas=False, out_dir=out_dir)
 
         process_mvn(out_dir, 'lf0', id_list=id_list, deltas=normalisation_of_deltas, out_dir=out_dir)
-        process_mvn(out_dir, 'sp', id_list=id_list, deltas=normalisation_of_deltas, out_dir=out_dir)
-        process_mvn(out_dir, 'ap', id_list=id_list, deltas=normalisation_of_deltas, out_dir=out_dir)
+        process_mvn(out_dir, 'mcep', id_list=id_list, deltas=normalisation_of_deltas, out_dir=out_dir)
+        process_mvn(out_dir, 'bap', id_list=id_list, deltas=normalisation_of_deltas, out_dir=out_dir)
 
 
 def main():
