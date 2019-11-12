@@ -43,14 +43,14 @@ def process(lab_dir, id_list, out_dir, state_level):
 
     for file_id in file_ids:
         # Label processing.
-        lab_path = os.path.join(lab_dir, '{}.lab'.format(file_id))
+        lab_path = os.path.join(lab_dir, f'{file_id}.lab')
         label = lab_to_feat.Label(lab_path, state_level)
 
         phones = label.phones
         n_phones = len(label.phones)
 
-        file_io.save_lines(phones, os.path.join(out_dir, 'phones', '{}.txt'.format(file_id)))
-        file_io.save_txt(n_phones, os.path.join(out_dir, 'n_phones', '{}.txt'.format(file_id)))
+        file_io.save_lines(phones, os.path.join(out_dir, 'phones', f'{file_id}.txt'))
+        file_io.save_txt(n_phones, os.path.join(out_dir, 'n_phones', f'{file_id}.txt'))
 
 
 def main():

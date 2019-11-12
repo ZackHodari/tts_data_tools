@@ -19,7 +19,7 @@ def load_dir(load_fn, path, file_ids, feat_ext=None):
     for file_id in file_ids:
 
         if feat_ext is not None:
-            file_id = '{}.{}'.format(file_id, feat_ext)
+            file_id = f'{file_id}.{feat_ext}'
         file_path = os.path.join(path, file_id)
 
         datum = load_fn(file_path)
@@ -32,7 +32,7 @@ def save_dir(save_fn, path, data, file_ids, feat_ext=None):
     for datum, file_id in zip(data, file_ids):
 
         if feat_ext is not None:
-            file_id = '{}.{}'.format(file_id, feat_ext)
+            file_id = f'{file_id}.{feat_ext}'
         file_path = os.path.join(path, file_id)
 
         save_fn(datum, file_path)
@@ -53,7 +53,7 @@ def sanitise_array(data):
     elif array.ndim == 1:
         array = array[:, np.newaxis]
     elif array.ndim != 2:
-        raise ValueError("Only 1/2 dimensional data can be saved to text files, data.shape = {}".format(array.shape))
+        raise ValueError(f'Only 1/2 dimensional data can be saved to text files, data.shape = {array.shape}')
 
     return array
 
@@ -96,7 +96,7 @@ def save_lines(lines, file_path):
     Args:
         lines (list<str>): Sequence of strings.
         file_path (str): File to save the text to."""
-    lines = list(map(lambda x: '{}\n'.format(x), lines))
+    lines = list(map(lambda x: f'{x}\n', lines))
 
     with open(file_path, 'w') as f:
         f.writelines(lines)
@@ -127,7 +127,7 @@ def save_wav(data, file_path, sample_rate):
     if np.issubdtype(data.dtype, np.floating):
         data = data.astype(np.float32)
     elif data.dtype not in [np.int32, np.int16, np.uint8]:
-        raise ValueError("wavfile data must be np.float*, np.int32, np.int16, or np.uint8, got {}".format(data.dtype))
+        raise ValueError(f'wavfile data must be np.float*, np.int32, np.int16, or np.uint8, got {data.dtype}')
 
     wavfile.write(file_path, sample_rate, data)
 
@@ -191,12 +191,12 @@ def save_txt(data, file_path):
     # If the data is floating then format the values in scientific notation.
     if np.issubdtype(array.dtype, np.floating):
         array = array.astype(np.float32)
-        formatter = lambda x: '{:.12E}'.format(x)
+        formatter = lambda x: f'{x:.12E}'
     elif np.issubdtype(array.dtype, np.integer):
         array = array.astype(np.int32)
         formatter = lambda x: str(x)
     else:
-        raise TypeError("Type of the data could not be serialised - {}".format(array.dtype))
+        raise TypeError(f'Type of the data could not be serialised - {array.dtype}')
 
     lines = [' '.join(formatter(val) for val in row) + '\n' for row in array]
     with open(file_path, 'w') as f:

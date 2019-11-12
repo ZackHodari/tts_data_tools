@@ -89,7 +89,7 @@ def process(lab_dir, wav_dir, id_list, out_dir,
 
     for file_id in tqdm(file_ids):
         # Label processing.
-        lab_path = os.path.join(lab_dir, '{}.lab'.format(file_id))
+        lab_path = os.path.join(lab_dir, f'{file_id}.lab')
         label = lab_to_feat.Label(lab_path, state_level)
 
         numerical_labels = label.extract_numerical_labels(question_set, upsample_to_frame_level=upsample)
@@ -101,7 +101,7 @@ def process(lab_dir, wav_dir, id_list, out_dir,
         n_phones = len(label.phones)
 
         # Acoustic processing.
-        wav_path = os.path.join(wav_dir, '{}.wav'.format(file_id))
+        wav_path = os.path.join(wav_dir, f'{file_id}.wav')
         wav, sample_rate = file_io.load_wav(wav_path)
 
         f0, vuv, mcep, bap = world_with_reaper_f0.analysis(wav, sample_rate)
@@ -111,18 +111,17 @@ def process(lab_dir, wav_dir, id_list, out_dir,
         # Often the durations from forced alignment are a few frames longer than the vocoder features.
         diff = n_frames - f0.shape[0]
         if diff > n_phones:
-            raise ValueError("Number of label frames and vocoder frames is too different for {name}\n"
-                             "\tlabel frames {lab}\n"
-                             "\tvocoder frames {voc}\n"
-                             "\tnumber of phones {phones}"
-                             .format(name=file_id, lab=n_frames, voc=f0.shape[0], phones=n_phones))
+            raise ValueError(f'Number of label frames and vocoder frames is too different for {file_id}\n'
+                             f'\tlabel frames {n_frames}\n'
+                             f'\tvocoder frames {f0.shape[0]}\n'
+                             f'\tnumber of phones {n_phones}')
 
         # Remove excess durations if there is a shape mismatch.
         if diff > 0:
             # Remove 1 frame from each phone's duration starting at the end of the sequence.
             durations[-diff:] -= 1
             n_frames = f0.shape[0]
-            print("Cropped {} frames from durations for utterance {}".format(diff, file_id))
+            print(f'Cropped {diff} frames from durations for utterance {file_id}')
 
         assert n_frames == np.sum(durations).item()
 
@@ -154,18 +153,18 @@ def process(lab_dir, wav_dir, id_list, out_dir,
         mcep = mcep[trim_frame_slice]
         bap = bap[trim_frame_slice]
 
-        file_io.save_bin(numerical_labels.astype(np.float32), os.path.join(out_dir, 'lab', file_id))
-        file_io.save_bin(counter_features.astype(np.float32), os.path.join(out_dir, 'counters', file_id))
-        file_io.save_txt(durations, os.path.join(out_dir, 'dur', '{}.txt'.format(file_id)))
-        file_io.save_lines(phones, os.path.join(out_dir, 'phones', '{}.txt'.format(file_id)))
+        file_io.save_bin(numerical_labels.astype(np.float32), os.path.join(out_dir, 'lab', f'{file_id}.npy'))
+        file_io.save_bin(counter_features.astype(np.float32), os.path.join(out_dir, 'counters', f'{file_id}.npy'))
+        file_io.save_txt(durations, os.path.join(out_dir, 'dur', f'{file_id}.txt'))
+        file_io.save_lines(phones, os.path.join(out_dir, 'phones', f'{file_id}.txt'))
 
-        file_io.save_txt(n_frames, os.path.join(out_dir, 'n_frames', '{}.txt'.format(file_id)))
-        file_io.save_txt(n_phones, os.path.join(out_dir, 'n_phones', '{}.txt'.format(file_id)))
+        file_io.save_txt(n_frames, os.path.join(out_dir, 'n_frames', f'{file_id}.txt'))
+        file_io.save_txt(n_phones, os.path.join(out_dir, 'n_phones', f'{file_id}.txt'))
 
-        file_io.save_bin(lf0.astype(np.float32), os.path.join(out_dir, 'lf0', file_id))
-        file_io.save_bin(vuv, os.path.join(out_dir, 'vuv', file_id))
-        file_io.save_bin(mcep.astype(np.float32), os.path.join(out_dir, 'mcep', file_id))
-        file_io.save_bin(bap.astype(np.float32), os.path.join(out_dir, 'bap', file_id))
+        file_io.save_bin(lf0.astype(np.float32), os.path.join(out_dir, 'lf0', f'{file_id}.npy'))
+        file_io.save_bin(vuv, os.path.join(out_dir, 'vuv', f'{file_id}.npy'))
+        file_io.save_bin(mcep.astype(np.float32), os.path.join(out_dir, 'mcep', f'{file_id}.npy'))
+        file_io.save_bin(bap.astype(np.float32), os.path.join(out_dir, 'bap', f'{file_id}.npy'))
 
     if calculate_normalisation:
         process_minmax(out_dir, 'lab', id_list, out_dir=out_dir)

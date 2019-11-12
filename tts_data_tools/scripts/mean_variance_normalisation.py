@@ -111,11 +111,11 @@ def process(data_dir, feat_name, id_list=None, is_npy=True, deltas=False, out_di
 
     # Possibly save the parameters to json files.
     if out_dir is not None:
-        mvn_file_path = os.path.join(out_dir, '{}_mvn.json'.format(feat_name))
+        mvn_file_path = os.path.join(out_dir, f'{feat_name}_mvn.json')
         file_io.save_json(mvn_params, mvn_file_path)
 
         if deltas:
-            delta_mvn_file_path = os.path.join(out_dir, '{}_deltas_mvn.json'.format(feat_name))
+            delta_mvn_file_path = os.path.join(out_dir, f'{feat_name}_deltas_mvn.json')
             file_io.save_json(delta_mvn_params, delta_mvn_file_path)
 
 

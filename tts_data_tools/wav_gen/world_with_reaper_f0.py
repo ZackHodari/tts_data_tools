@@ -35,7 +35,7 @@ def basic_analysis(wav, sample_rate):
     diff = f0_world.shape[0] - f0.shape[0]
     assert diff >= 2, (
         "We expect REAPER's f0 estimate to be at least 2 frames shorter that WORLD's f0,"
-        "got len(f0_REAPER) = {}, len(f0_WORLD) = {}".format(f0.shape[0], f0_world.shape[0]))
+        f"got len(f0_REAPER) = {f0.shape[0]}, len(f0_WORLD) = {f0_world.shape[0]}")
 
     pad_start = np.repeat(f0[0, np.newaxis], 2, axis=0)
     pad_end = np.repeat(f0[-1, np.newaxis], diff - 2, axis=0)
@@ -90,7 +90,7 @@ def process(wav_dir, id_list, out_dir, calculate_normalisation, normalisation_of
     make_dirs(os.path.join(out_dir, 'wav_synth'), file_ids)
 
     for file_id in file_ids:
-        wav_path = os.path.join(wav_dir, '{}.wav'.format(file_id))
+        wav_path = os.path.join(wav_dir, f'{file_id}.wav')
         wav, sample_rate = file_io.load_wav(wav_path)
 
         f0, vuv, mcep, bap = analysis(wav, sample_rate)
@@ -98,10 +98,10 @@ def process(wav_dir, id_list, out_dir, calculate_normalisation, normalisation_of
 
         wav_synth = synthesis(f0, vuv, mcep, bap, sample_rate)
 
-        file_io.save_bin(lf0, os.path.join(out_dir, 'lf0', file_id))
-        file_io.save_bin(vuv, os.path.join(out_dir, 'vuv', file_id))
-        file_io.save_bin(mcep, os.path.join(out_dir, 'mcep', file_id))
-        file_io.save_bin(bap, os.path.join(out_dir, 'bap', file_id))
+        file_io.save_bin(lf0, os.path.join(out_dir, 'lf0', f'{file_id}.npy'))
+        file_io.save_bin(vuv, os.path.join(out_dir, 'vuv', f'{file_id}.npy'))
+        file_io.save_bin(mcep, os.path.join(out_dir, 'mcep', f'{file_id}.npy'))
+        file_io.save_bin(bap, os.path.join(out_dir, 'bap', f'{file_id}.npy'))
         file_io.save_wav(wav_synth, os.path.join(out_dir, 'wav_synth', f'{file_id}.wav'), sample_rate)
 
     if calculate_normalisation:

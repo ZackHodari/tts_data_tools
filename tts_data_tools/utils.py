@@ -8,8 +8,8 @@ import numpy as np
 
 def add_boolean_arg(parser, name, help):
     r"""Adds two arguments (one with a \"no-" prefix), allowing for a positive or a negative boolean argument."""
-    parser.add_argument("--{}".format(name), dest=name, action="store_true", default=True, help=help)
-    parser.add_argument("--no-{}".format(name), dest=name, action="store_false", help=argparse.SUPPRESS)
+    parser.add_argument(f'--{name}', dest=name, action="store_true", default=True, help=help)
+    parser.add_argument(f'--no-{name}', dest=name, action="store_false", help=argparse.SUPPRESS)
 
 
 def listify(object_or_list):
@@ -41,7 +41,7 @@ def get_file_ids(file_dir=None, id_list=None):
 
         # Check that `file_ids` is a subset of `_file_ids`
         if (file_dir is not None) and (not set(file_ids).issubset(_file_ids)):
-            raise ValueError("All basenames in id_list '{}' must be present in file_dir '{}'".format(id_list, file_dir))
+            raise ValueError(f"All basenames in id_list '{id_list}' must be present in file_dir '{file_dir}")
 
     return file_ids
 

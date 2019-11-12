@@ -59,7 +59,7 @@ class _DataSource(object):
 
     def file_path(self, base_name, data_dir):
         r"""Creates file path for a given base name and data directory."""
-        return os.path.join(data_dir, self.name, '{}.{}'.format(base_name, self.ext))
+        return os.path.join(data_dir, self.name, f'{base_name}.{self.ext}')
 
     def load_files(self, base_names, data_dir):
         for base_name in base_names:
@@ -121,7 +121,7 @@ class _DataSource(object):
 
         if self.use_deltas:
             deltas = compute_deltas(feature)
-            features['{}_deltas'.format(self.name)] = deltas.astype(np.float32)
+            features[f'{self.name}_deltas'] = deltas.astype(np.float32)
 
         return features
 

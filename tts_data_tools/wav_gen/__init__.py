@@ -14,7 +14,7 @@ def main():
     args, remaining_args = parser.parse_known_args()
 
     # Import and run the chosen waveform generation module.
-    eval('from tts_data_tools.wav_gen import {}'.format(args.type))
+    eval(f'from tts_data_tools.wav_gen import {args.type}')
     module = eval(args.type)
     module.main()
 

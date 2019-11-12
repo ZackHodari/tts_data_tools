@@ -66,14 +66,14 @@ def process(wav_dir, id_list, out_dir, calculate_normalisation, normalisation_of
     file_ids = get_file_ids(wav_dir, id_list)
 
     for file_id in file_ids:
-        wav_path = os.path.join(wav_dir, '{}.wav'.format(file_id))
+        wav_path = os.path.join(wav_dir, f'{file_id}.wav')
         wav, sample_rate = file_io.load_wav(wav_path)
 
         f0, vuv = analysis(wav, sample_rate)
         lf0 = np.log(f0)
 
-        file_io.save_bin(lf0, os.path.join(out_dir, 'lf0', '{}.lf0'.format(file_id)))
-        file_io.save_bin(vuv, os.path.join(out_dir, 'vuv', '{}.vuv'.format(file_id)))
+        file_io.save_bin(lf0, os.path.join(out_dir, 'lf0', f'{file_id}.npy'))
+        file_io.save_bin(vuv, os.path.join(out_dir, 'vuv', f'{file_id}.npy'))
 
     if calculate_normalisation:
         process_mvn(out_dir, 'lf0', id_list=id_list, deltas=normalisation_of_deltas)

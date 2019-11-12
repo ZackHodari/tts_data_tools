@@ -73,7 +73,7 @@ def process(data_dir, feat_name, id_list=None, is_npy=True, out_dir=None):
     minmax_params = calculate_minmax_parameters(feature_list)
 
     if out_dir is not None:
-        minmax_file_path = os.path.join(out_dir, '{}_minmax.json'.format(feat_name))
+        minmax_file_path = os.path.join(out_dir, f'{feat_name}_minmax.json')
         file_io.save_json(minmax_params, minmax_file_path)
 
 

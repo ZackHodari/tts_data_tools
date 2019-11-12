@@ -185,7 +185,7 @@ class QuestionSet(object):
             return re.compile(pattern)
 
         else:
-            raise ValueError("Question type {} not recognised or supported".format(question_type))
+            raise ValueError(f'Question type {question_type} not recognised or supported')
 
     @staticmethod
     def wildcards_to_python_regex(question, convert_number_pattern=False):
@@ -569,8 +569,8 @@ class Label(object):
                     frame_in_phone_index += 1
                     frame_index += 1
 
-        print("Counter features created for {}: {} frames; {} subphone counter features."
-              .format(self.base_name, n_frames, counter_dim))
+        print(f'Counter features created for {self.base_name}: '
+              f'{n_frames} frames; {counter_dim} subphone counter features.')
 
         return counter_features
 
@@ -603,8 +603,8 @@ class Label(object):
                         numerical_labels[frame_index] = label_vector
                         frame_index += 1
 
-            print("Numerical labels created for {}, upsampled to frame-level: {} phones; {} frames; {} label features."
-                  .format(self.base_name, len(self.phones), seq_len, lab_dim))
+            print(f'Numerical labels created for {self.base_name}, upsampled to frame-level: '
+                  f'{len(self.phones)} phones; {seq_len} frames; {lab_dim} label features.')
 
         else:
             for phone_index, label in enumerate(self.labels):
@@ -612,8 +612,8 @@ class Label(object):
                 label_vector = question_set.query(label)
                 numerical_labels[phone_index] = label_vector
 
-            print("Numerical labels created for {}, at phone-level: {} phones; {} label features."
-                  .format(self.base_name, seq_len, lab_dim))
+            print(f'Numerical labels created for {self.base_name}, at phone-level: '
+                  f'{seq_len} phones; {lab_dim} label features.')
 
         return numerical_labels
 
@@ -643,7 +643,7 @@ def process(lab_dir, id_list, out_dir, state_level,
     subphone_feature_set = SubphoneFeatureSet(subphone_feat_type)
 
     for file_id in file_ids:
-        lab_path = os.path.join(lab_dir, '{}.lab'.format(file_id))
+        lab_path = os.path.join(lab_dir, f'{file_id}.lab')
         label = Label(lab_path, state_level)
 
         numerical_labels = label.extract_numerical_labels(question_set, upsample_to_frame_level=upsample)
@@ -654,13 +654,13 @@ def process(lab_dir, id_list, out_dir, state_level,
         n_frames = np.sum(durations).item()
         n_phones = len(label.phones)
 
-        file_io.save_bin(numerical_labels, os.path.join(out_dir, 'lab', '{}.lab'.format(file_id)))
-        file_io.save_bin(counter_features, os.path.join(out_dir, 'counters', '{}.counters'.format(file_id)))
-        file_io.save_txt(durations, os.path.join(out_dir, 'dur', '{}.dur'.format(file_id)))
-        file_io.save_lines(phones, os.path.join(out_dir, 'phones', '{}.txt'.format(file_id)))
+        file_io.save_bin(numerical_labels, os.path.join(out_dir, 'lab', f'{file_id}.npy'))
+        file_io.save_bin(counter_features, os.path.join(out_dir, 'counters', f'{file_id}.npy'))
+        file_io.save_txt(durations, os.path.join(out_dir, 'dur', f'{file_id}.dur'))
+        file_io.save_lines(phones, os.path.join(out_dir, 'phones', f'{file_id}.txt'))
 
-        file_io.save_txt(n_frames, os.path.join(out_dir, 'n_frames', '{}.txt'.format(file_id)))
-        file_io.save_txt(n_phones, os.path.join(out_dir, 'n_phones', '{}.txt'.format(file_id)))
+        file_io.save_txt(n_frames, os.path.join(out_dir, 'n_frames', f'{file_id}.txt'))
+        file_io.save_txt(n_phones, os.path.join(out_dir, 'n_phones', f'{file_id}.txt'))
 
     if calculate_normalisation:
         process_minmax(out_dir, 'lab', id_list)
