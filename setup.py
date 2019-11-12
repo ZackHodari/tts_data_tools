@@ -18,17 +18,7 @@ setup(
         'tqdm'
     ],
     packages=['tts_data_tools'],
-    package_data={'tts_data_tools': [
-        'resources/question_sets/questions-unilex_dnn_600.hed',
-        'resources/question_sets/questions-unilex_phones_69.hed',
-        'resources/question_sets/questions-radio_dnn_416.hed',
-        'resources/question_sets/questions-radio_phones_48.hed',
-        'resources/question_sets/questions-mandarin.hed',
-        'resources/festival/extra_feats.scm',
-        'resources/festival/label.feats',
-        'resources/festival/label-full.awk',
-        'resources/festival/label-mono.awk',
-    ]},
+    package_data={'tts_data_tools': ['resources/*']},
     entry_points={'console_scripts': [
         'tdt_lab_gen = tts_data_tools.lab_gen:main',
         'tdt_txt_to_utt = tts_data_tools.lab_gen.txt_to_utt:main',
