@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 from tts_data_tools import file_io
-from tts_data_tools.utils import get_file_ids
+from tts_data_tools.utils import get_file_ids, make_dirs
 from tts_data_tools.wav_gen import utils
 
 from tts_data_tools.scripts.mean_variance_normalisation import process as process_mvn
@@ -64,6 +64,9 @@ def process(wav_dir, id_list, out_dir, calculate_normalisation, normalisation_of
         normalisation_of_deltas (bool): Also calculate the MVN parameters for the delta and delta delta features.
     """
     file_ids = get_file_ids(wav_dir, id_list)
+
+    make_dirs(os.path.join(out_dir, 'lf0'), file_ids)
+    make_dirs(os.path.join(out_dir, 'vuv'), file_ids)
 
     for file_id in file_ids:
         wav_path = os.path.join(wav_dir, f'{file_id}.wav')

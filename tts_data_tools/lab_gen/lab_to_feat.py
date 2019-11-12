@@ -18,7 +18,7 @@ from scipy.stats import norm
 
 from tts_data_tools import file_io
 from tts_data_tools import lab_gen
-from tts_data_tools.utils import get_file_ids
+from tts_data_tools.utils import get_file_ids, make_dirs
 
 from tts_data_tools.scripts.mean_variance_normalisation import process as process_mvn
 from tts_data_tools.scripts.min_max_normalisation import process as process_minmax
@@ -641,6 +641,13 @@ def process(lab_dir, id_list, out_dir, state_level,
     file_ids = get_file_ids(id_list=id_list)
     question_set = QuestionSet(question_file)
     subphone_feature_set = SubphoneFeatureSet(subphone_feat_type)
+
+    make_dirs(os.path.join(out_dir, 'lab'), file_ids)
+    make_dirs(os.path.join(out_dir, 'counters'), file_ids)
+    make_dirs(os.path.join(out_dir, 'dur'), file_ids)
+    make_dirs(os.path.join(out_dir, 'phones'), file_ids)
+    make_dirs(os.path.join(out_dir, 'n_frames'), file_ids)
+    make_dirs(os.path.join(out_dir, 'n_phones'), file_ids)
 
     for file_id in file_ids:
         lab_path = os.path.join(lab_dir, f'{file_id}.lab')
