@@ -48,7 +48,7 @@ def add_arguments(parser):
                         help="Directory to save the output to.")
     parser.add_argument("--label_mono_awk", action="store", dest="label_mono_awk", type=str, default='label-mono.awk',
                         help="Directory to save the output to.")
-    parser.add_argument("--custom_voice", action="store", dest="custom_voice", type=str, default=False,
+    parser.add_argument("--custom_voice", action="store", dest="custom_voice", type=str, default=None,
                         help="Name of Festival voice to use when generating Utterance structures.")
 
 

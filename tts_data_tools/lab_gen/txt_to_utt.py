@@ -29,7 +29,7 @@ def add_arguments(parser):
                         help="List of file basenames to process (must be provided if txt_dir is used).")
     parser.add_argument("--out_dir", action="store", dest="out_dir", type=str, required=True,
                         help="Directory to save the output to.")
-    parser.add_argument("--custom_voice", action="store", dest="custom_voice", type=str, default=False,
+    parser.add_argument("--custom_voice", action="store", dest="custom_voice", type=str, default=None,
                         help="Name of Festival voice to use when generating Utterance structures.")
 
 
