@@ -21,9 +21,9 @@ from tts_data_tools import utils
 def add_arguments(parser):
     parser.add_argument("--festival_dir", action="store", dest="festival_dir", type=str, required=True,
                         help="Directory containing festival installation.")
-    parser.add_argument("--txt_file", action="store", dest="txt_file", type=str, required=True,
+    parser.add_argument("--txt_file", action="store", dest="txt_file", type=str, default=None,
                         help="File containing all transcriptions.")
-    parser.add_argument("--txt_dir", action="store", dest="txt_dir", type=str, required=True,
+    parser.add_argument("--txt_dir", action="store", dest="txt_dir", type=str, default=None,
                         help="Directory containing text transcriptions.")
     parser.add_argument("--id_list", action="store", dest="id_list", type=str, required=True,
                         help="List of file basenames to process (must be provided if txt_dir is used).")
