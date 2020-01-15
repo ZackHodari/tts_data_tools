@@ -172,6 +172,66 @@ class StringSource(_DataSource):
         file_io.save_lines(data, file_path)
 
 
+class VocabSource(StringSource):
+    r"""Loads text and converts each line into a one-hot vector according to the given vocabulary.
+
+    Parameters
+    ----------
+    name : str
+        Name of directory that will contain this feature.
+    vocab_file : str
+        Name of the file containing the vocabulary.
+    ext : str, optional
+        The file extension of the saved features, if not set `name` is used.
+    """
+    def __init__(self, name, vocab_file, ext='txt'):
+        super(VocabSource, self).__init__(name, ext)
+        self.vocab_file = vocab_file
+
+        self.vocab = file_io.load_lines(self.vocab_file)
+        self.vocab_map = {token: i for i, token in enumerate(self.vocab)}
+        self.vocab_size = len(self.vocab)
+
+    def load_file(self, base_name, data_dir):
+        r"""Loads lines of text and converts to one-hot.
+
+        Parameters
+        ----------
+        base_name : str
+            The name (without extensions) of the file to be loaded.
+        data_dir : str
+            The directory containing all feature types for this dataset.
+
+        Returns
+        -------
+        list<int>
+        """
+        tokens = super(VocabSource, self).load_file(base_name, data_dir)
+
+        indices = np.array([self.vocab_map[token] if token in self.vocab else -1 for token in tokens])
+
+        one_hot = np.zeros((indices.shape[0], self.vocab_size), dtype=np.int)
+        one_hot[np.arange(indices.shape[0]), indices] = 1
+        one_hot[indices == -1] = 0
+
+        return one_hot
+
+    def save_file(self, data, base_name, data_dir):
+        r"""Saves one-hot as original token sequence using vocabulary.
+
+        Parameters
+        ----------
+        data : list<int>
+            Sequence of indices.
+        base_name : str
+            The name (without extensions) of the file to be loaded.
+        data_dir : str
+            The directory containing all feature types for this dataset.
+        """
+        tokens = [self.vocab[i] for i in data.argmax(axis=1)]
+        super(VocabSource, self).save_file(tokens, base_name, data)
+
+
 class ASCIISource(StringSource):
     r"""Loads data from a text file, this will be loaded as strings where each item should be on a new line.
 

@@ -84,6 +84,14 @@ def compute_deltas(feature):
     return np.concatenate((feature, velocity, acceleration), axis=1)
 
 
+def freq_to_mel(freq):
+    return 1127. * np.log(1. + (freq / 700.))
+
+
+def mel_to_freq(mel):
+    return 700 * (np.exp(mel / 1127.) - 1)
+
+
 def extract_vuv(signal, unvoiced_value):
     is_unvoiced = np.isclose(signal, unvoiced_value * np.ones_like(signal), atol=1e-6)
     is_voiced = np.logical_not(is_unvoiced)
