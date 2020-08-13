@@ -34,7 +34,8 @@ def add_arguments(parser):
 
 
 def create_utterances(festival_dir, file_ids, sentences, out_dir, custom_voice=None):
-    scm_commands = [f'#!{festival_dir}/bin/festival']
+    festival_exe = os.path.join(festival_dir, 'bin', 'festival')
+    scm_commands = [f'#!{festival_exe}']
 
     if custom_voice is not None:
         # Run Festival with a particular voice.
@@ -55,7 +56,6 @@ def create_utterances(festival_dir, file_ids, sentences, out_dir, custom_voice=N
     utils.make_dirs(os.path.join(out_dir, 'utts'), file_ids)
 
     # Run the commands.
-    festival_exe = os.path.join(festival_dir, 'bin', 'festival')
     scm_file = os.path.join(out_dir, 'gen_utts.scm')
     # Argument `check=True` ensures that an exception is raised if the process' return code is non-zero.
     subprocess.run([festival_exe, '-b', scm_file], check=True)
